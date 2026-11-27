@@ -34,6 +34,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Security
 
+- Docker: the code, the venv and the start scripts of the image belong to root, as in the DEB and RPM packages, so code running as the `ucm` account can no longer change what the container runs at its next start; that account keeps only `/opt/ucm/data`, `/var/log/ucm` and `/etc/ucm`.
 - Settings, SMTP OAuth: the console accepted an authorization result posted by any window, the provider's page included; it now takes it only from its own popup on the console's origin.
 - Operations, OPNsense import: the API key and secret were kept in clear in the browser's session storage after a connection test and survived a sign-out; only the host, port and TLS check stay there now, the credentials are held in memory until sign-out.
 - Email settings: `write:settings` (the operator role) could point the SMTP server, and with it every password-reset link, at a host of its choosing; the SMTP target (host, port, security, authentication, account, sender, OAuth2 client, endpoints and consent) now changes only with `admin:settings`, like `base_url`, and so do the email templates, which wrap those links.
@@ -64,6 +65,8 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Fixed
 
+- Docker: when the first start stopped before UCM registered the SoftHSM token it had just created (database not ready, `docker stop`), the token's PIN was lost and `SoftHSM-Default` was never created; the PIN is now kept in the data volume until the provider holds it.
+- Helm chart: an HA render without cluster access (`helm template`, GitOps) drew a new `UCM_SECRET_KEY` at each render without restarting the pods, so pods started from two renders had different session keys; it now refuses to render until `secrets.secretKey` is set.
 - Docker: without `UCM_SECRET_KEY` the image generated a new session key at each start, so a restart signed every session out and broke what was signed with the key; the key generated at the first start is now kept in `/etc/ucm/secret.key` and used again (#457).
 - Dialogs: a message raised while a dialog was open was drawn under its blurred backdrop, unreadable and its buttons out of reach; the error or warning that answers a form dialog now shows in the dialog above its buttons, and any other message is drawn above the dialog; on a phone a message takes the screen's width instead of half of it (#456).
 - Web interface: after a restart of the service that changed `SECRET_KEY` (before 3.1, a container without `UCM_SECRET_KEY` generated one at each start), a page left open stayed signed in but every save failed with `403 CSRF validation failed`; a token now stays valid for the session that received it, and a refused token is renewed and the request sent once more, with a "reload the page" message if that fails too (#457).

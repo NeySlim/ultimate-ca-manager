@@ -11,8 +11,9 @@ ROOT = pathlib.Path(__file__).resolve().parents[2]
 CHART = ROOT / 'charts' / 'ucm'
 PG = ['--set', 'database.type=postgresql', '--set', 'database.databaseUrl=postgresql://u:p@db/ucm']
 HA = ['--set', 'ha.enabled=true', '--set', 'replicaCount=2'] + PG
-# helm template has no cluster: an HA render there takes both keys from the values
-GIVEN_KEYS = ['--set', 'secrets.keyEncryptionKey=K', '--set', 'secrets.dbEncryptionKey=D']
+# helm template has no cluster: an HA render there takes the three keys from the values
+GIVEN_KEYS = ['--set', 'secrets.keyEncryptionKey=K', '--set', 'secrets.dbEncryptionKey=D',
+              '--set', 'secrets.secretKey=S']
 SECRET_LOOKUP = 'lookup "v1" "Secret" .Release.Namespace'
 SA_LOOKUP = '(lookup "v1" "ServiceAccount" .Release.Namespace "default")'
 
@@ -182,8 +183,11 @@ def test_an_ha_render_without_a_cluster_refuses_to_draw_keys():
     assert 'secrets.keyEncryptionKey' in r.stderr and '--dry-run=server' in r.stderr
     r = _render(*HA, '--set', 'secrets.keyEncryptionKey=K', check=False)
     assert r.returncode != 0 and 'secrets.dbEncryptionKey' in r.stderr
-    docs = _docs(*HA, '--set', 'secrets.keyEncryptionKey=K', '--set', 'secrets.dbEncryptionKey=D')
+    r = _render(*HA, '--set', 'secrets.keyEncryptionKey=K', '--set', 'secrets.dbEncryptionKey=D', check=False)
+    assert r.returncode != 0 and 'set secrets.secretKey too' in r.stderr
+    docs = _docs(*HA, *GIVEN_KEYS)
     assert docs['Secret']['stringData']['KEY_ENCRYPTION_KEY'] == 'K'
+    assert docs['Secret']['stringData']['UCM_SECRET_KEY'] == 'S'
 
 
 def test_the_refusal_names_an_install_into_a_namespace_not_created_yet():

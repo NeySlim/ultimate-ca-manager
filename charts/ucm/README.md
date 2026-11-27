@@ -58,7 +58,7 @@ The `*-etc` PVC mounts `/etc/ucm`, which holds `master.key` — the symmetric ke
 | `secrets.dbEncryptionKey` | `""` | `UCM_DB_ENCRYPTION_KEY` (Fernet key) for the integration secrets, passed to the pods whenever set or already in the Secret; generated once when empty only with `ha.enabled`, where a render without cluster access (`helm template`, GitOps) refuses to draw it |
 | `fqdn` | `ucm.local` | Default AIA-CRL-OCSP base URL, and FQDN of the self-signed UI certificate, generated at the first start only: a later change does not replace it (apply a certificate, or regenerate the self-signed one, in Settings > HTTPS) |
 | `initialAdminPassword` | `""` (generated into the Secret, kept across upgrades) | First-boot admin password; the generated one must be changed at first login, a value set here is not forced to change. Read the generated one with `kubectl get secret <fullname>-secrets -o jsonpath='{.data.UCM_INITIAL_ADMIN_PASSWORD}' \| base64 -d`. Unused when `extraEnv` sets `INITIAL_ADMIN_PASSWORD` (your own Secret) or `INITIAL_ADMIN_PASSWORD_FILE`: the chart then passes no password of its own and forces no change |
-| `secrets.secretKey` | `""` (auto-generated + persisted) | Flask session secret |
+| `secrets.secretKey` | `""` (auto-generated + persisted) | Flask session secret; with `ha.enabled`, a render without cluster access (`helm template`, GitOps) refuses to draw it |
 | `database.type` | `sqlite` | `sqlite` or `postgresql` |
 | `database.databaseUrl` | `""` | `postgresql://…` when `type=postgresql` |
 | `database.existingSecret` / `database.existingSecretKey` | `""` / `DATABASE_URL` | Use an existing Secret for the DB URL |

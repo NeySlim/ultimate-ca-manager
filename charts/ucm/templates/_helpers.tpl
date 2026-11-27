@@ -84,10 +84,13 @@ app.kubernetes.io/instance: {{ .Release.Name }}
        drawn keys would replace the stored ones at each sync, unseen by running pods */ -}}
 {{- if not (include "ucm.clusterReachable" .) -}}
 {{- if not .Values.secrets.keyEncryptionKey -}}
-{{- fail "ha.enabled: this render cannot read the release's Secret (helm template, GitOps, helm upgrade --dry-run without =server, helm diff): set secrets.keyEncryptionKey and secrets.dbEncryptionKey, or render against the cluster (--dry-run=server); a key drawn here would replace the one the data is under. helm install --create-namespace renders before the namespace exists, so it is refused too: create the namespace first, or set both keys (docs/HA.md)" -}}
+{{- fail "ha.enabled: this render cannot read the release's Secret (helm template, GitOps, helm upgrade --dry-run without =server, helm diff): set secrets.keyEncryptionKey, secrets.dbEncryptionKey and secrets.secretKey, or render against the cluster (--dry-run=server); a key drawn here would replace the one the data is under. helm install --create-namespace renders before the namespace exists, so it is refused too: create the namespace first, or set the three keys (docs/HA.md)" -}}
 {{- end -}}
 {{- if not .Values.secrets.dbEncryptionKey -}}
-{{- fail "ha.enabled: this render cannot read the release's Secret (helm template, GitOps, helm upgrade --dry-run without =server, helm diff): set secrets.dbEncryptionKey too, or render against the cluster (--dry-run=server); for helm install --create-namespace, create the namespace first (docs/HA.md)" -}}
+{{- fail "ha.enabled: this render cannot read the release's Secret (helm template, GitOps, helm upgrade --dry-run without =server, helm diff): set secrets.dbEncryptionKey and secrets.secretKey too, or render against the cluster (--dry-run=server); for helm install --create-namespace, create the namespace first (docs/HA.md)" -}}
+{{- end -}}
+{{- if not .Values.secrets.secretKey -}}
+{{- fail "ha.enabled: this render cannot read the release's Secret (helm template, GitOps, helm upgrade --dry-run without =server, helm diff): set secrets.secretKey too, or render against the cluster (--dry-run=server); a key drawn here would differ between the pods started before and after the next sync (docs/HA.md)" -}}
 {{- end -}}
 {{- else if .Release.IsUpgrade -}}
 {{- /* On a cluster, an existing release without these keys in its Secret is a single instance moving to HA */ -}}

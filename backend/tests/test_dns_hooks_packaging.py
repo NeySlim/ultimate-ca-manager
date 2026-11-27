@@ -76,4 +76,4 @@ def test_the_packages_ship_the_hook_directory_root_owned():
     assert 'install -d -o root -g root -m 0755 /etc/ucm/dns-hooks' in dockerfile
     # Made after the chown that gives /etc/ucm to the service account
     assert dockerfile.index('install -d -o root -g root -m 0755 /etc/ucm/dns-hooks') > \
-        dockerfile.index('chown -R ucm:ucm /opt/ucm /var/log/ucm /etc/ucm')
+        dockerfile.index('chown -R ucm:ucm /opt/ucm/data /var/log/ucm /etc/ucm')

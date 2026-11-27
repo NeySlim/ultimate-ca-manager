@@ -166,11 +166,11 @@ COPY --from=builder /opt/ucm/venv /opt/ucm/venv
 # Set working directory (same as DEB/RPM)
 WORKDIR /opt/ucm
 
-# Copy application files with proper ownership (same layout as packages)
-COPY --chown=ucm:ucm VERSION /opt/ucm/VERSION
-COPY --chown=ucm:ucm LICENSE NOTICE COMMERCIAL-LICENSE.md /opt/ucm/
-COPY --chown=ucm:ucm backend/ /opt/ucm/backend/
-COPY --chown=ucm:ucm docker/fips-module.sh /fips-module.sh
+# Application files stay root's, as in the packages: the account cannot change what it runs
+COPY VERSION /opt/ucm/VERSION
+COPY LICENSE NOTICE COMMERCIAL-LICENSE.md /opt/ucm/
+COPY backend/ /opt/ucm/backend/
+COPY docker/fips-module.sh /fips-module.sh
 # FIPS variant: what the module approves, asked of it under the configuration the
 # entrypoint writes, so the readiness check judges keys by it before the switch; and the
 # module-mac of this install, root-owned, that the entrypoint compares at each start
@@ -198,9 +198,9 @@ import fips_mode; fips_mode.write_build_capability(sys.argv[1])' /usr/share/ucm/
 # Only the built interface: the server serves frontend/dist, while frontend/
 # as a whole carries the sources and node_modules, several hundred megabytes
 # of build-time dependencies that have no place in a runtime image
-COPY --chown=ucm:ucm frontend/dist/ /opt/ucm/frontend/dist/
-COPY --chown=ucm:ucm wsgi.py /opt/ucm/wsgi.py
-COPY --chown=ucm:ucm .env.docker.example /opt/ucm/.env.example
+COPY frontend/dist/ /opt/ucm/frontend/dist/
+COPY wsgi.py /opt/ucm/wsgi.py
+COPY .env.docker.example /opt/ucm/.env.example
 
 # Create data + log directories
 # Listed one by one: this runs under /bin/sh, which does not expand braces on
@@ -211,7 +211,7 @@ RUN for d in ca certs private crl scep backups sessions logs temp; do \
     done && \
     mkdir -p /var/log/ucm && \
     mkdir -p /etc/ucm && \
-    chown -R ucm:ucm /opt/ucm /var/log/ucm /etc/ucm && \
+    chown -R ucm:ucm /opt/ucm/data /var/log/ucm /etc/ucm && \
     install -d -o root -g root -m 0755 /etc/ucm/dns-hooks
 
 # Set environment variables
@@ -245,13 +245,16 @@ VOLUME ["/etc/ucm", "/opt/ucm/data"]
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
     CMD curl -f -k "https://127.0.0.1:${UCM_HTTPS_PORT:-8443}/health" || exit 1
 
-# Copy entrypoint before switching user
-COPY --chown=ucm:ucm docker/entrypoint.sh /entrypoint.sh
-COPY --chown=ucm:ucm docker/dns-update-port.sh /dns-update-port.sh
-COPY --chown=ucm:ucm docker/ha-secret.sh /ha-secret.sh
-COPY --chown=ucm:ucm docker/secret-key.sh /secret-key.sh
-COPY --chown=ucm:ucm docker/ha-database.sh /ha-database.sh
-RUN chmod +x /entrypoint.sh
+# Start scripts root's too; COPY keeps the build context's modes, so group and other
+# write is removed from every root file the account could otherwise change
+COPY docker/entrypoint.sh /entrypoint.sh
+COPY docker/dns-update-port.sh /dns-update-port.sh
+COPY docker/ha-secret.sh /ha-secret.sh
+COPY docker/secret-key.sh /secret-key.sh
+COPY docker/ha-database.sh /ha-database.sh
+RUN chmod 0755 /entrypoint.sh && \
+    find /opt/ucm /entrypoint.sh /fips-module.sh /dns-update-port.sh /ha-secret.sh /secret-key.sh \
+        /ha-database.sh -path /opt/ucm/data -prune -o -perm /022 -exec chmod go-w {} +
 
 # Switch to non-root user
 USER ucm
