@@ -74,7 +74,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Fixed
 
-- Packages: on a host whose name is longer than 64 characters the install stopped without a message while generating the HTTPS certificate; the common name is now the first label of the name, which stays whole in the subject alternative name, and a failure prints the OpenSSL error.
+- Packages: on a host whose name is longer than 64 characters, generating the HTTPS certificate failed without a message (the DEB install stopped, the RPM install went on without it); the common name is now the first label, cut at 64, the whole name stays in the subject alternative name, and a failure prints the OpenSSL error.
 - Docker: when the first start stopped before UCM registered the SoftHSM token it had just created (database not ready, `docker stop`), the token's PIN was lost and `SoftHSM-Default` was never created; the PIN is now kept in the data volume until the provider holds it.
 - Helm chart: an HA render without cluster access (`helm template`, GitOps) drew a new `UCM_SECRET_KEY` at each render without restarting the pods, so pods started from two renders had different session keys; it now refuses to render until `secrets.secretKey` is set.
 - ACME server: a key-change refused because the new key belongs to another account now names that account in a `Location` header (RFC 8555 §7.3.5).

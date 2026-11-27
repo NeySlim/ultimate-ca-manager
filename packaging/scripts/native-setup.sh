@@ -782,7 +782,8 @@ cmd_https_cert() {
     trap "rm -rf -- $(printf %q "$work")" EXIT
     if ! out=$(openssl req -x509 -nodes -days 3650 -newkey rsa:2048 -keyout "$work/key.pem" -out "$work/cert.pem" \
         -subj "/CN=${cn}/O=UCM/OU=PKI" -addext "subjectAltName=${san}" 2>&1); then
-        printf 'HTTPS certificate not generated: %s\n' "$out" >&2
+        # Without the key generation's progress dots
+        printf 'ERROR: HTTPS certificate not generated: %s\n' "$(printf '%s\n' "$out" | grep -v '^[.+*-]*$')" >&2
         return 1
     fi
     own write "$data/https_key.pem" 600 "$user:$group" < "$work/key.pem"

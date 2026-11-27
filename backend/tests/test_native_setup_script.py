@@ -1498,12 +1498,22 @@ def test_a_name_past_64_characters_keeps_its_first_label_as_common_name(tmp_path
     assert cn == 'runnervm0abcd1' and dns == [fqdn, 'localhost']
 
 
+@pytest.mark.parametrize('fqdn', ['l' * 70 + '.example.test', 'n' * 70])
+def test_a_first_label_past_64_characters_is_cut_at_64(tmp_path, fqdn):
+    data = tmp_path / 'data'
+    data.mkdir()
+    result = _https_cert(tmp_path, data, fqdn=fqdn)
+    assert result.returncode == 0, result.stderr
+    assert _cert_names(data / 'https_cert.pem') == (fqdn[:64], [fqdn, 'localhost'])
+
+
 def test_an_openssl_failure_says_why(tmp_path):
     data = tmp_path / 'data'
     data.mkdir()
-    _stub(tmp_path / 'hostbin' / 'openssl', 'echo "unable to load provider" >&2; exit 1')
+    _stub(tmp_path / 'hostbin' / 'openssl', 'echo "..+++++*" >&2; echo "-----" >&2; echo "unable to load provider" >&2; exit 1')
     result = _https_cert(tmp_path, data)
-    assert result.returncode != 0 and 'unable to load provider' in result.stderr, result.stderr
+    assert result.returncode != 0, result.stderr
+    assert result.stderr.strip() == 'ERROR: HTTPS certificate not generated: unable to load provider', result.stderr
     assert not (data / 'https_cert.pem').exists()
 
 
