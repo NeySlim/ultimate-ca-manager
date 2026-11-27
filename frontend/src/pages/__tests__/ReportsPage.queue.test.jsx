@@ -51,9 +51,11 @@ beforeEach(() => {
   stable.perms = ALL
   certs.getStats.mockResolvedValue({ data: { total: 282, expiring: 8, expired: 3, revoked: 4 } })
   const soon = new Date(Date.now() + 3 * HOUR)
+  // The monthly run a week or more away, whatever today's date: never in the next 24 hours
+  const monthDay = Math.min(new Date(Date.now() + 10 * 24 * HOUR).getUTCDate(), 28)
   api.getSchedule.mockResolvedValue({ data: {
     expiring_certificates: { enabled: true, frequency: 'daily', time: hhmm(soon), recipients: ['pki@example.com'], format: 'csv' },
-    certificate_inventory: { enabled: true, frequency: 'monthly', time: '06:45', day_of_month: 28, recipients: [], format: 'json' },
+    certificate_inventory: { enabled: true, frequency: 'monthly', time: '06:45', day_of_month: monthDay, recipients: [], format: 'json' },
   } })
   api.getPdfTemplates.mockResolvedValue({ data: { templates: {}, sections: ['executive_summary', 'expiry'] } })
   api.updateSchedule.mockResolvedValue({ data: {} })
