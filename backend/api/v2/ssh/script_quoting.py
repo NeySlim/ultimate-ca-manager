@@ -3,8 +3,6 @@ import re
 
 # Every character a shell or PowerShell may read as the end of a line, and the other controls
 _CONTROL = re.compile(r'[\x00-\x1f\x7f\x85  ]')
-# PowerShell closes a single-quoted string on any of these; doubling one keeps it literal
-_PS_SINGLE_QUOTES = "'‘’‚‛"
 
 
 def has_control_character(text):
@@ -22,8 +20,24 @@ def sh_literal(text):
 
 
 def ps_literal(text):
-    """A PowerShell single-quoted string holding *text*: no variable, subexpression or escape."""
-    return "'" + ''.join(c * 2 if c in _PS_SINGLE_QUOTES else c for c in one_line(text)) + "'"
+    """A PowerShell string expression holding *text*: no variable, subexpression or escape.
+    Pure ASCII, since Windows PowerShell reads a BOM-less script in the ANSI code page, where
+    UTF-8 bytes can decode to a quote: each non-ASCII UTF-16 unit becomes [char]0xHHHH."""
+    parts, run = [], []
+    for c in one_line(text):
+        if c.isascii():
+            run.append("''" if c == "'" else c)
+            continue
+        if run or not parts:
+            parts.append("'" + ''.join(run) + "'")
+            run = []
+        units = c.encode('utf-16-le', 'surrogatepass')
+        parts.extend('[char]0x%04X' % int.from_bytes(units[k:k + 2], 'little') for k in range(0, len(units), 2))
+    if not parts:
+        return "'" + ''.join(run) + "'"
+    if run:
+        parts.append("'" + ''.join(run) + "'")
+    return '(' + ' + '.join(parts) + ')'
 
 
 def ps_help_comment(text):

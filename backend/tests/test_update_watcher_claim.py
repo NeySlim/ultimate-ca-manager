@@ -172,6 +172,14 @@ def test_a_symbolic_link_is_refused(host):
     assert target.read_bytes() == b'genuine package'
 
 
+
+def test_a_package_over_one_gib_is_refused(host):
+    path = host.data / 'updates' / 'ucm_99.0_all.deb'
+    with open(path, 'wb') as f:
+        f.truncate((1 << 30) + 1)
+    _refused(*host.run(path), 'over 1 GiB')
+    assert not list(host.tmp.glob('ucm-update.*'))
+
 @pytest.mark.parametrize('name', ['x.deb', 'ucm_99.0_amd64.deb', 'evil-99.0-1.fc43.noarch.rpm',
                                   'ucm_99.0_all.deb.sha256'])
 def test_a_name_that_is_not_a_release_asset_is_refused(host, name):

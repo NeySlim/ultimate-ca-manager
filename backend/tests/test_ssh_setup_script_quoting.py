@@ -81,14 +81,26 @@ def _ps_literal_value(literal):
     return ''.join(out)
 
 
+def _ps_value(expr):
+    """The value of a quoted literal, or of ('literal' + [char]0xHHHH + ...) with ASCII literals."""
+    assert expr.isascii(), 'a non-ASCII byte may read as a quote in an ANSI code page'
+    if not expr.startswith('('):
+        return _ps_literal_value(expr)
+    assert expr.endswith(')')
+    parts = re.findall(r"'(?:[^']|'')*'|\[char\]0x[0-9A-F]{4}", expr[1:-1])
+    assert ' + '.join(parts) == expr[1:-1] and parts[0].startswith("'")
+    units = ''.join(chr(int(p[8:], 16)) if p.startswith('[') else _ps_literal_value(p) for p in parts)
+    return units.encode('utf-16-le', 'surrogatepass').decode('utf-16-le')
+
+
 @pytest.mark.parametrize('ca_type', ['user', 'host'])
 def test_the_powershell_script_holds_the_description_as_a_literal(tmp_path, ca_type):
     descr = _trap(tmp_path)
     script = _generate_setup_script(SimpleNamespace(descr=descr, id=7), PUB, ca_type, '', 'windows')
     shown = _one_line(descr)
-    banner = re.findall(r"^Write-Host \('CA:\s*' \+ ('.*')\)$", script, re.M)
+    banner = re.findall(r"^Write-Host \('CA:\s*' \+ (.*)\)$", script, re.M)
     assert len(banner) == 1, 'the CA banner is not a single-quoted literal'
-    assert _ps_literal_value(banner[0]) == shown
+    assert _ps_value(banner[0]) == shown
     # The help block stays closed until its own #>, the label sits on one line inside it
     help_block = script[:script.index('#>')]
     assert '.EXAMPLE' in help_block
@@ -96,6 +108,21 @@ def test_the_powershell_script_holds_the_description_as_a_literal(tmp_path, ca_t
         == [f'CA: {shown.replace("#>", "# >")}']
     # Nowhere else: no double-quoted string ever holds it
     assert script.count(f'New-Item {tmp_path}/ps') == 2
+
+
+@pytest.mark.parametrize('descr', ['G\u0142\u00f3wny CA', 'K\u0151) ; New-Item C:\\pwned #', 'emoji \U0001F511 CA'])
+@pytest.mark.parametrize('ca_type', ['user', 'host'])
+def test_powershell_code_stays_ascii_for_a_non_ascii_description(ca_type, descr):
+    """Windows PowerShell 5.1 reads a BOM-less .ps1 in the ANSI code page, where UTF-8 bytes
+    of a letter can decode to a quote: outside the help comment the script is pure ASCII."""
+    script = _generate_setup_script(SimpleNamespace(descr=descr, id=7), PUB, ca_type, 'h\u00f6st', 'windows')
+    code = script[script.index('#>'):]
+    assert code.isascii()
+    banner = re.findall(r"^Write-Host \('CA:\s*' \+ (.*)\)$", script, re.M)
+    assert len(banner) == 1 and _ps_value(banner[0]) == descr
+    if ca_type == 'host':
+        literal = re.findall(r'^\$Hostname\s+= (.*)$', script, re.M)
+        assert len(literal) == 1 and _ps_value(literal[0]) == 'h\u00f6st'
 
 
 @pytest.mark.skipif(not shutil.which('pwsh'), reason='pwsh not available')
@@ -135,7 +162,7 @@ def test_the_public_route_serves_a_stored_description_as_text(app, auth_client, 
         db.session.commit()
     windows = app.test_client().get(f"/ssh/setup/{ca['refid']}?platform=windows")
     assert windows.status_code == 200
-    assert re.search(r"^Write-Host \('CA:\s*' \+ '", windows.data.decode(), re.M)
+    assert re.search(r"^Write-Host \('CA:\s*' \+ \('", windows.data.decode(), re.M)
     script = app.test_client().get(f"/ssh/setup/{ca['refid']}").data.decode()
     run = _run_banner(SHELLS[0], script, tmp_path)
     _no_marker(marker)
