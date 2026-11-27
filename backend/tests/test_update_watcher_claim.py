@@ -10,6 +10,7 @@ only). The stubs compare versions as dpkg and rpm do for the forms UCM releases 
 """
 import hashlib
 import json
+import os
 import pathlib
 import shutil
 import subprocess
@@ -205,6 +206,21 @@ def test_a_symbolic_link_is_refused(host):
     _refused(*host.run(link), 'symbolic link', host)
     assert target.read_bytes() == b'genuine package'
 
+
+
+@pytest.mark.parametrize('kind', ['fifo', 'directory'])
+def test_a_package_that_is_not_a_regular_file_is_refused(host, kind):
+    # Refused by the shell's -f first; the S_ISREG check of claim_package is a backstop for a swap
+    path = host.data / 'updates' / 'ucm_99.0_all.deb'
+    os.mkfifo(path) if kind == 'fifo' else path.mkdir()
+    _refused(*host.run(path), 'invalid or missing package path', host)
+
+
+def test_a_package_over_one_gib_is_refused(host):
+    path = host.data / 'updates' / 'ucm_99.0_all.deb'
+    with open(path, 'wb') as f:
+        f.truncate((1 << 30) + 1)
+    _refused(*host.run(path), 'over 1 GiB', host)
 
 @pytest.mark.parametrize('name', ['x.deb', 'ucm_99.0_amd64.deb', 'evil-99.0-1.fc43.noarch.rpm',
                                   'ucm_99.0_all.deb.sha256', 'ucm.rpm'])
