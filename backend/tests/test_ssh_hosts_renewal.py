@@ -69,7 +69,8 @@ def _since(app):
 
 def _audits(app, since, action):
     with app.app_context():
-        return [(a.success, a.details) for a in AuditLog.query.filter(AuditLog.id > since, AuditLog.action == action)]
+        rows = AuditLog.query.filter(AuditLog.id > since, AuditLog.action == action).order_by(AuditLog.id)
+        return [(a.success, a.details) for a in rows]
 
 
 class TestTheChallenge:

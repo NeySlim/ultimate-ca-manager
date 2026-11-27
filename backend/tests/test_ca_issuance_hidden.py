@@ -50,7 +50,7 @@ def test_the_change_is_audited(app, auth_client, create_ca):
     ca = create_ca(cn='Issuance audited CA')
     assert _patch(auth_client, ca['id'], issuanceHidden=True).status_code == 200
     with app.app_context():
-        details = [a.details for a in AuditLog.query.filter_by(action='ca_updated', resource_id=str(ca['id']))]
+        details = [a.details for a in AuditLog.query.filter_by(action='ca_updated', resource_id=str(ca['id'])).order_by(AuditLog.id)]
     assert 'CA Issuance audited CA updated: hidden from issuance pickers' in details, details
 
 

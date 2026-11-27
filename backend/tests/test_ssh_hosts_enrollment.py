@@ -58,7 +58,8 @@ def _enroll(client, ca, token, key=None, principals=None, text=False, signature=
 
 def _audits(app, action, since):
     with app.app_context():
-        return [(a.success, a.details) for a in AuditLog.query.filter(AuditLog.id > since, AuditLog.action == action)]
+        rows = AuditLog.query.filter(AuditLog.id > since, AuditLog.action == action).order_by(AuditLog.id)
+        return [(a.success, a.details) for a in rows]
 
 
 def _last_audit(app):

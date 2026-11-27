@@ -22,7 +22,7 @@ def _row(app, ca_id):
 
 def _audits(app, ca_id):
     with app.app_context():
-        return [a.details for a in AuditLog.query.filter_by(action='ca_updated', resource_id=str(ca_id))]
+        return [a.details for a in AuditLog.query.filter_by(action='ca_updated', resource_id=str(ca_id)).order_by(AuditLog.id)]
 
 
 def test_the_name_changes_trimmed_and_the_certificate_stays(app, auth_client, create_ca):
