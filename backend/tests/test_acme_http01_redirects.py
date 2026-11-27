@@ -230,6 +230,18 @@ class TestHttp01FailureProblemTypes:
             problem = json.loads(challenge.error)
             assert problem['type'] == 'urn:ietf:params:acme:error:incorrectResponse'
 
+    def test_encoded_body_is_an_incorrect_response(self, app, acme_account_id, monkeypatch):
+        import json
+        with app.app_context():
+            service = AcmeService(base_url='http://localhost')
+            challenge, account, key_authz = _make_http01(service, acme_account_id, 'gzip-body.example.com')
+            self._public(monkeypatch)
+            _install_get(monkeypatch, [_Resp(200, text=key_authz, headers={'Content-Encoding': 'gzip'})])
+
+            assert service.validate_http01_challenge(challenge, account) is False
+            problem = json.loads(challenge.error)
+            assert problem['type'] == 'urn:ietf:params:acme:error:incorrectResponse'
+
     def test_timeout_is_a_connection_problem(self, app, acme_account_id, monkeypatch):
         import json
         with app.app_context():

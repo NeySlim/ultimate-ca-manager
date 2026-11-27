@@ -381,6 +381,18 @@ _pinned_resolution = threading.local()
 
 
 def _patched_create_connection(address, *args, **kwargs):
+    sock = _pinned_create_connection(address, *args, **kwargs)
+    watch = getattr(_pinned_resolution, 'socket_watch', None)
+    if watch is not None:
+        try:
+            watch(sock)
+        except BaseException:
+            sock.close()
+            raise
+    return sock
+
+
+def _pinned_create_connection(address, *args, **kwargs):
     """urllib3.util.connection.create_connection wrapper that re-routes
     the connection to a thread-locally pinned IP while keeping the
     original hostname intact for SNI / cert verification.
@@ -423,6 +435,19 @@ def _ensure_urllib3_patched():
         from urllib3.util import connection as urllib3_connection
         _orig_create_connection = urllib3_connection.create_connection
         urllib3_connection.create_connection = _patched_create_connection
+
+
+@contextmanager
+def watch_sockets(callback):
+    """Within this block, every socket urllib3 opens on this thread is passed to
+    `callback` as soon as it is connected (before TLS, which detaches it)."""
+    _ensure_urllib3_patched()
+    prev = getattr(_pinned_resolution, 'socket_watch', None)
+    _pinned_resolution.socket_watch = callback
+    try:
+        yield
+    finally:
+        _pinned_resolution.socket_watch = prev
 
 
 @contextmanager

@@ -3,7 +3,10 @@
 A challenge server under the ACME account's control can stream an endless body
 or drip it one byte at a time; neither may hold memory or a worker past a bound.
 """
+import gzip
 import http.server
+import os
+import socket
 import threading
 import time
 
@@ -121,3 +124,102 @@ def test_http01_error_body_is_not_read_so_its_status_is_reported(challenge_serve
     monkeypatch.setattr(http01, 'challenge_url', lambda identifier, token: url)
     ok, reason = http01.challenge_reachable('127.0.0.1', {'token': 'tok', 'key_authorization': 'x'})
     assert (ok, reason) == (False, f'{url}: HTTP 404')
+
+
+# Raw servers: a prefix sent at once, then one byte every 0.5 s for 12 s. Each byte
+# lands inside the per-read timeout, in a read that never hands control back.
+_GZIP_FCOMMENT = b'\x1f\x8b\x08\x10\x00\x00\x00\x00\x00\xff'
+_RAW_DRIPS = {
+    'headers': (b'HTTP/1.1 200 OK\r\nX-Pad: ', b'a' * 24),
+    'chunk_extension': (b'HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n1;', b'a' * 24),
+    'gzip_comment': (b'HTTP/1.1 200 OK\r\nContent-Encoding: gzip\r\nConnection: close\r\n\r\n'
+                     + _GZIP_FCOMMENT, b'a' * 24),
+}
+
+
+@pytest.fixture
+def raw_server():
+    listeners = []
+
+    def start(prefix, drip):
+        listener = socket.create_server(('127.0.0.1', 0))
+        listeners.append(listener)
+
+        def serve():
+            try:
+                conn, _ = listener.accept()
+            except OSError:
+                return
+            with conn:
+                try:
+                    request = b''
+                    while b'\r\n\r\n' not in request:
+                        data = conn.recv(4096)
+                        if not data:
+                            return
+                        request += data
+                    conn.sendall(prefix)
+                    for i in range(len(drip)):
+                        conn.sendall(drip[i:i + 1])
+                        time.sleep(0.5)
+                except OSError:
+                    pass
+
+        threading.Thread(target=serve, daemon=True).start()
+        return f'http://127.0.0.1:{listener.getsockname()[1]}/.well-known/acme-challenge/tok'
+
+    yield start
+    for listener in listeners:
+        listener.close()
+
+
+@pytest.mark.parametrize('case', sorted(_RAW_DRIPS))
+def test_http01_deadline_holds_in_reads_that_never_return(raw_server, case):
+    url = raw_server(*_RAW_DRIPS[case])
+    started = time.monotonic()
+    # A gzip body is refused on its headers; without that refusal the deadline stops it.
+    with pytest.raises((requests.Timeout, http01.IncorrectResponse) if case == 'gzip_comment'
+                       else requests.Timeout):
+        http01.fetch_following_redirects(url, None, allow_private=True, timeout=1)
+    assert time.monotonic() - started < 5
+
+
+def test_http01_asks_for_and_requires_an_identity_body(raw_server):
+    body = gzip.compress(b'tok.thumbprint')
+    url = raw_server(b'HTTP/1.1 200 OK\r\nContent-Encoding: gzip\r\nContent-Length: %d\r\n\r\n%s'
+                     % (len(body), body), b'')
+    with pytest.raises(http01.IncorrectResponse, match='Content-Encoding'):
+        http01.fetch_following_redirects(url, None, allow_private=True, timeout=5)
+
+
+def test_http01_sends_accept_encoding_identity(raw_server):
+    seen = []
+    url = raw_server(b'HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nok', b'')
+    real_get = requests.get
+
+    def spy(*args, **kwargs):
+        seen.append(kwargs.get('headers'))
+        return real_get(*args, **kwargs)
+
+    import unittest.mock
+    with unittest.mock.patch.object(requests, 'get', spy):
+        assert http01.fetch_following_redirects(url, None, allow_private=True, timeout=5).text == 'ok'
+    assert seen == [{'Accept-Encoding': 'identity'}]
+
+
+def _open_fds():
+    return len(os.listdir('/proc/self/fd'))
+
+
+def test_http01_deadline_timer_leaks_no_thread_or_socket(challenge_server):
+    url = challenge_server('tok.thumbprint\n')
+    http01.fetch_following_redirects(url, None, allow_private=True, timeout=5)
+    fds = _open_fds()
+    for _ in range(50):
+        assert http01.fetch_following_redirects(url, None, allow_private=True, timeout=5).status_code == 200
+    assert not [t for t in threading.enumerate() if isinstance(t, threading.Timer)]
+    for _ in range(20):
+        if _open_fds() - fds < 5:
+            break
+        time.sleep(0.1)
+    assert _open_fds() - fds < 5
