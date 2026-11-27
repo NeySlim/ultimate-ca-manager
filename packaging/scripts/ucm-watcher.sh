@@ -195,10 +195,21 @@ with os.fdopen(fd, "rb") as src:
     work = tempfile.mkdtemp(prefix="ucm-update.")
     copy = os.path.join(work, name)
     digest = hashlib.sha256()
-    with open(copy, "wb") as dst:
-        for chunk in iter(lambda: src.read(1 << 20), b""):
-            digest.update(chunk)
-            dst.write(chunk)
+    try:
+        # A file still growing after fstat stops at the same cap
+        with open(copy, "wb") as dst:
+            size = 0
+            for chunk in iter(lambda: src.read(1 << 20), b""):
+                size += len(chunk)
+                if size > 1 << 30:
+                    raise OverflowError
+                digest.update(chunk)
+                dst.write(chunk)
+    except Exception as e:
+        if os.path.exists(copy):
+            os.remove(copy)
+        os.rmdir(work)
+        refuse("package is over 1 GiB" if isinstance(e, OverflowError) else "package copy failed: %s" % e)
 drop()
 url = "%s/v%s/%s.sha256" % (os.environ["RELEASES"], to, name)
 def discard(reason):
