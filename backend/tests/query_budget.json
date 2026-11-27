@@ -1,0 +1,218 @@
+{
+ "sqlite": {
+  "admin": {
+   "/api/v2/health": [
+    0,
+    3
+   ],
+   "/api/v2/auth/verify": [
+    0,
+    17
+   ],
+   "/api/v2/webhooks": [
+    0,
+    16
+   ],
+   "/api/v2/dashboard/stats": [
+    0,
+    27
+   ],
+   "/api/v2/dashboard/queue?limit=100": [
+    0,
+    20
+   ],
+   "/api/v2/cas": [
+    0,
+    18
+   ],
+   "/api/v2/certificates/stats": [
+    0,
+    22
+   ],
+   "/api/v2/settings/general": [
+    0,
+    55
+   ],
+   "/api/v2/reports/schedule": [
+    0,
+    27
+   ],
+   "/assets/vendor-AbC123.js": [
+    0,
+    3
+   ]
+  },
+  "viewer": {
+   "/api/v2/health": [
+    0,
+    3
+   ],
+   "/api/v2/auth/verify": [
+    0,
+    19
+   ],
+   "/api/v2/webhooks": [
+    0,
+    17
+   ],
+   "/api/v2/dashboard/stats": [
+    0,
+    29
+   ],
+   "/api/v2/dashboard/queue?limit=100": [
+    0,
+    22
+   ],
+   "/api/v2/cas": [
+    0,
+    20
+   ],
+   "/api/v2/certificates/stats": [
+    0,
+    24
+   ],
+   "/api/v2/settings/general": [
+    0,
+    17
+   ],
+   "/api/v2/reports/schedule": [
+    0,
+    17
+   ],
+   "/assets/vendor-AbC123.js": [
+    0,
+    3
+   ]
+  }
+ },
+ "postgresql": {
+  "admin": {
+   "/api/v2/health": [
+    0,
+    3
+   ],
+   "/api/v2/auth/verify": [
+    0,
+    17
+   ],
+   "/api/v2/webhooks": [
+    0,
+    16
+   ],
+   "/api/v2/dashboard/stats": [
+    0,
+    27
+   ],
+   "/api/v2/dashboard/queue?limit=100": [
+    0,
+    20
+   ],
+   "/api/v2/cas": [
+    0,
+    18
+   ],
+   "/api/v2/certificates/stats": [
+    0,
+    22
+   ],
+   "/api/v2/settings/general": [
+    0,
+    55
+   ],
+   "/api/v2/reports/schedule": [
+    0,
+    27
+   ],
+   "/assets/vendor-AbC123.js": [
+    0,
+    3
+   ]
+  },
+  "viewer": {
+   "/api/v2/health": [
+    0,
+    3
+   ],
+   "/api/v2/auth/verify": [
+    0,
+    19
+   ],
+   "/api/v2/webhooks": [
+    0,
+    17
+   ],
+   "/api/v2/dashboard/stats": [
+    0,
+    29
+   ],
+   "/api/v2/dashboard/queue?limit=100": [
+    0,
+    22
+   ],
+   "/api/v2/cas": [
+    0,
+    20
+   ],
+   "/api/v2/certificates/stats": [
+    0,
+    24
+   ],
+   "/api/v2/settings/general": [
+    0,
+    17
+   ],
+   "/api/v2/reports/schedule": [
+    0,
+    17
+   ],
+   "/assets/vendor-AbC123.js": [
+    0,
+    3
+   ]
+  }
+ },
+ "postgresql+sql-sessions": {
+  "admin": {
+   "/api/v2/health": [
+    3,
+    3
+   ],
+   "/api/v2/auth/verify": [
+    3,
+    17
+   ],
+   "/api/v2/webhooks": [
+    3,
+    16
+   ],
+   "/api/v2/dashboard/stats": [
+    3,
+    27
+   ],
+   "/api/v2/dashboard/queue?limit=100": [
+    3,
+    20
+   ],
+   "/api/v2/cas": [
+    3,
+    18
+   ],
+   "/api/v2/certificates/stats": [
+    3,
+    22
+   ],
+   "/api/v2/settings/general": [
+    3,
+    55
+   ],
+   "/api/v2/reports/schedule": [
+    3,
+    27
+   ],
+   "/assets/vendor-AbC123.js": [
+    3,
+    3
+   ]
+  }
+ }
+}
