@@ -205,3 +205,44 @@ class TestHttp01RedirectFollowing:
             assert challenge.status == 'invalid'
             assert 'connection' in (challenge.error or '')
             assert len(calls) == 1
+
+
+class TestHttp01FailureProblemTypes:
+    """RFC 8555 §6.7: the problem type names what failed."""
+
+    @staticmethod
+    def _public(monkeypatch):
+        monkeypatch.setattr(
+            ssrf_protection.socket, 'getaddrinfo',
+            lambda host, *_a, **_kw: [(socket.AF_INET, socket.SOCK_STREAM, 6, '',
+                                       ('93.184.216.34', 0))],
+        )
+
+    def test_oversized_body_is_an_incorrect_response(self, app, acme_account_id, monkeypatch):
+        import json
+        with app.app_context():
+            service = AcmeService(base_url='http://localhost')
+            challenge, account, _ = _make_http01(service, acme_account_id, 'big-body.example.com')
+            self._public(monkeypatch)
+            _install_get(monkeypatch, [_Resp(200, text='A' * 4096)])
+
+            assert service.validate_http01_challenge(challenge, account) is False
+            problem = json.loads(challenge.error)
+            assert problem['type'] == 'urn:ietf:params:acme:error:incorrectResponse'
+
+    def test_timeout_is_a_connection_problem(self, app, acme_account_id, monkeypatch):
+        import json
+        with app.app_context():
+            service = AcmeService(base_url='http://localhost')
+            challenge, account, _ = _make_http01(service, acme_account_id, 'slow-body.example.com')
+            self._public(monkeypatch)
+
+            def _timeout(url, **kwargs):
+                raise requests.Timeout('read timed out')
+
+            monkeypatch.setattr(requests, 'get', _timeout)
+
+            assert service.validate_http01_challenge(challenge, account) is False
+            problem = json.loads(challenge.error)
+            assert problem['type'] == 'urn:ietf:params:acme:error:connection'
+            assert 'timed out' in problem['detail'].lower()

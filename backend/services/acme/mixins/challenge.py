@@ -5,9 +5,11 @@ import base64
 import logging
 from typing import Optional
 
+import requests
+
 from models import db
 from models.acme_models import AcmeChallenge, AcmeAuthorization
-from services.acme.http01 import fetch_following_redirects
+from services.acme.http01 import ResponseTooLarge, fetch_following_redirects
 from utils.datetime_utils import utc_now
 
 logger = logging.getLogger(__name__)
@@ -139,7 +141,14 @@ class ChallengeMixin:
                 return False
 
         except Exception as e:
-            self._invalidate_challenge(challenge, 'connection', str(e))
+            # RFC 8555 §6.7: the server answered, so an oversized body is an
+            # incorrectResponse; a deadline or a network failure is a connection problem.
+            if isinstance(e, ResponseTooLarge):
+                self._invalidate_challenge(challenge, 'incorrectResponse', str(e))
+            elif isinstance(e, requests.Timeout):
+                self._invalidate_challenge(challenge, 'connection', f'Timed out: {e}')
+            else:
+                self._invalidate_challenge(challenge, 'connection', str(e))
             try:
                 db.session.commit()
             except Exception as commit_err:
