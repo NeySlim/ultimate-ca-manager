@@ -317,6 +317,7 @@ class TestTheRenewal:
         assert r.status_code == 403 and r.get_json()['state'] == 'revoked'
         assert any(rec.levelname == 'ERROR' and 'sweep will revoke it' in rec.getMessage() for rec in caplog.records)
         monkeypatch.undo()
+        monkeypatch.setattr(hosts, 'REVOKED_HOST_GRACE_SECONDS', 0, raising=False)  # the task's grace is over
         with app.app_context():
             renewed = SSHCertificate.query.filter(SSHCertificate.ssh_ca_id == enrolled[0]['id'],
                                                   SSHCertificate.source == 'renewal').one()
@@ -400,6 +401,15 @@ def _in_krl(client, tmp_path, ca, cert_line):
 
 
 class TestTheSweepOfRevokedHosts:
+    @pytest.fixture(autouse=True)
+    def _no_grace(self):
+        # The revocations here are cut short in the past: the task's grace is over. A patch of its
+        # own, which the tests' monkeypatch.undo() leaves in place
+        patch = pytest.MonkeyPatch()
+        patch.setattr(hosts, 'REVOKED_HOST_GRACE_SECONDS', 0, raising=False)
+        yield
+        patch.undo()
+
     def test_the_task_is_registered_at_its_interval(self, app):
         task = app.scheduler.tasks['ssh_revoked_host_sweep']
         assert task.func is hosts.sweep_revoked_hosts and task.interval == hosts.REVOKED_HOST_SWEEP_SECONDS
@@ -435,6 +445,7 @@ class TestTheSweepOfRevokedHosts:
         # timeline moved back as a whole, the revoked host's before it, for its renewal to be due
         with app.app_context():
             revoked, host = db.session.get(SSHHost, host_id), db.session.get(SSHHost, again)
+            revoked.enrolled_at -= timedelta(days=20)
             revoked.revoked_at -= timedelta(days=20)
             for cert_id in set(hosts._live_certificates_of_key(revoked)) - {host.certificate_id}:
                 db.session.get(SSHCertificate, cert_id).created_at -= timedelta(days=20)
@@ -476,3 +487,79 @@ class TestTheSweepOfRevokedHosts:
         with app.app_context():
             assert not db.session.get(SSHCertificate, kept).revoked
         assert post_json(auth_client, f'/api/v2/ssh/hosts/{host_id}/revoke', {}).status_code == 409
+
+
+class TestWhoFinishesARevocation:
+    def test_the_task_leaves_a_revocation_in_its_grace_to_its_request(self, app, auth_client, enrolled,
+                                                                      monkeypatch):
+        """The task running between revoked_at and the request's own sweep finishes nothing in its name."""
+        from services.ssh_cert import SSHCertificateService
+        _, refid, _ = enrolled
+        with app.app_context():
+            host = SSHHost.query.filter_by(refid=refid).one()
+            host_id, cert_id = host.id, host.certificate_id
+        real, ran = SSHCertificateService.revoke_certificate, []
+
+        def task_first(cert, *args, **kwargs):
+            if not ran:
+                ran.append(None)
+                ran[0] = hosts.sweep_revoked_hosts()
+            return real(cert, *args, **kwargs)
+        monkeypatch.setattr(SSHCertificateService, 'revoke_certificate', task_first)
+        since = _since(app)
+        assert post_json(auth_client, f'/api/v2/ssh/hosts/{host_id}/revoke', {}).status_code == 200
+        assert ran == [0]
+        assert _audits(app, since, 'ssh_host_revocation_finished') == []
+        with app.app_context():
+            cert = db.session.get(SSHCertificate, cert_id)
+            assert cert.revoked
+            done = AuditLog.query.filter(AuditLog.id > since, AuditLog.action == 'ssh_host_revoked').all()
+            assert [(a.username, a.resource_id) for a in done] == [('admin', str(host_id))]
+
+    def test_a_certificate_goes_with_the_host_enrolled_when_it_was_signed(self, app, auth_client, tmp_path,
+                                                                           monkeypatch):
+        """A key enrolled as A, revoked, enrolled again as B whose revocation was cut short: B's left."""
+        from services.ssh_cert import SSHCertificateService
+        monkeypatch.setattr(hosts, 'REVOKED_HOST_GRACE_SECONDS', 0, raising=False)
+        ca = _create_ssh_ca(auth_client, ca_type='host', descr=f'Owner CA {tmp_path.name}')
+        key = tmp_path / 'owner_key'
+        subprocess.run(['ssh-keygen', '-q', '-t', 'ed25519', '-N', '', '-f', str(key)], check=True)
+        line = (tmp_path / 'owner_key.pub').read_text().strip()
+        now = utc_now()
+
+        def signed(source, created):
+            cert = SSHCertificateService.sign_certificate(
+                ca_id=ca['id'], public_key_data=line, cert_type='host', principals=['owner01'],
+                validity_seconds=86400, descr='owner', source=source, username='t')
+            cert.created_at = created
+            db.session.commit()
+            return cert
+
+        def host(name, cert, enrolled_at):
+            row = SSHHost(ssh_ca_id=ca['id'], name=name, principals='["owner01"]', public_key=line,
+                          key_type='ed25519', fingerprint=cert.fingerprint, certificate_id=cert.id,
+                          auto_renew=True, enrolled_at=enrolled_at)
+            db.session.add(row)
+            db.session.commit()
+            return row
+
+        with app.app_context():
+            a = host(f'owner-a-{tmp_path.name}', signed('enrollment', now - timedelta(hours=3)),
+                     now - timedelta(hours=3))
+            hosts.revoke_host(a.id)
+            a = db.session.get(SSHHost, a.id)
+            a.revoked_at = now - timedelta(hours=2)
+            b = host(f'owner-b-{tmp_path.name}', signed('enrollment', now - timedelta(minutes=59)),
+                     now - timedelta(hours=1))
+            b.certificate_id = signed('renewal', now - timedelta(minutes=30)).id
+            # Revoked, its sweep cut short before either certificate
+            b.revoked_at, b.auto_renew = now - timedelta(minutes=20), False
+            db.session.commit()
+            a_id, b_id = a.id, b.id
+        since = _since(app)
+        with app.app_context():
+            assert hosts.sweep_revoked_hosts() == 2
+            done = AuditLog.query.filter(AuditLog.id > since,
+                                         AuditLog.action == 'ssh_host_revocation_finished').all()
+            assert [(a.resource_id, '2 certificate' in a.details) for a in done] == [(str(b_id), True)]
+            assert a_id != b_id

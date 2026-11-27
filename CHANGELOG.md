@@ -76,6 +76,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Fixed
 
+- SSH hosts: the revoked-host task could finish, as `system`, a revocation an administrator's request was still carrying out, and it filed the certificates of a key enrolled again under the earlier host; it now leaves a revocation to its request for five minutes, and a certificate goes with the host its key was enrolled as when it was signed.
 - Packages: on a host whose name is longer than 64 characters, generating the HTTPS certificate failed without a message (the DEB install stopped, the RPM install went on without it); the common name is now the first label, cut at 64, the whole name stays in the subject alternative name, and a failure prints the OpenSSL error.
 - Docker: when the first start stopped before UCM registered the SoftHSM token it had just created (database not ready, `docker stop`), the token's PIN was lost and `SoftHSM-Default` was never created; the PIN is now kept in the data volume until the provider holds it, and removed at start in FIPS or HA mode or once the token is gone.
 - Helm chart: an HA render without cluster access (`helm template`, GitOps) drew a new `UCM_SECRET_KEY` at each render without restarting the pods, so pods started from two renders had different session keys; it now refuses to render until `secrets.secretKey` is set.
