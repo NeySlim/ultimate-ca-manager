@@ -257,7 +257,7 @@ def _claim(rid, current, new, **values):
 
 
 def _give_back(rid):
-    """The claim of a download whose bundle could not be built: the approval stands again."""
+    """The claim of a download that did not hand the key out: the approval stands again."""
     try:
         db.session.rollback()
         _claim(rid, STATUS_RECOVERED, STATUS_APPROVED, recovered_by=None, recovered_at=None)
@@ -338,3 +338,4 @@ def recover_key(rid):
     finally:
         if not settled:
             _give_back(rid)
+            _audit('key_recovery.recover_failed', req, success=False)

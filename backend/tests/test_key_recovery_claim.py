@@ -113,12 +113,19 @@ def test_a_failure_after_the_bundle_is_built_gives_the_approval_back(app, auth_c
             raise RuntimeError('after the bundle')
         return real(*args, **kw)
     monkeypatch.setattr(key_recovery, where, late)
+    from models import AuditLog
+    with app.app_context():
+        before = AuditLog.query.filter_by(action='key_recovery.recover_failed').count()
     try:
         r = _post(auth_client, f'/api/v2/key-recovery/{rid}/recover', PW)
         assert r.status_code == 500
     except RuntimeError:
         pass  # propagated by the test app
     assert _status(app, rid) == 'approved'
+    if where == 'content_disposition':
+        # The attempt that handed nothing out stays in the audit trail
+        with app.app_context():
+            assert AuditLog.query.filter_by(action='key_recovery.recover_failed').count() == before + 1
 
 
 def test_an_account_reusing_a_deleted_requesters_name_cannot_collect(app, auth_client, create_user, create_cert):
