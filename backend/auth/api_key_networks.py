@@ -6,6 +6,7 @@ any address; a list no entry of which parses admits none.
 """
 import ipaddress
 import logging
+import re
 import time
 
 from utils import admin_allowlist
@@ -44,6 +45,33 @@ def within(networks, limits) -> bool:
                    for net in (_network(e) for e in networks))
     except ValueError:
         return False
+
+
+# The first version whose nodes enforce the list: an older node in HA accepts the key from anywhere
+ENFORCED_FROM = '3.1-dev'
+
+
+def nodes_not_enforcing() -> list:
+    """HA: the other nodes beating fresh on a version older than ENFORCED_FROM, as "node (version)"."""
+    from utils.ha import ha_enabled
+    if not ha_enabled():
+        return []
+    from config.settings import Config
+    from models.cluster import ClusterNode
+    from services.scheduler_leader import STALE_PASSES, cluster_utc_now
+    from services.scheduler_service import WAKE_INTERVAL_SECONDS
+    from services.updates import parse_version
+    now, stale = cluster_utc_now(), STALE_PASSES * WAKE_INTERVAL_SECONDS
+    floor, behind = parse_version(ENFORCED_FROM), []
+    # pid NULL: stopped cleanly; this node's own row may still hold the version it ran before
+    for node in ClusterNode.query.filter(ClusterNode.pid.isnot(None), ClusterNode.node_id != Config.NODE_ID):
+        if node.heartbeat_at is None or (now - node.heartbeat_at).total_seconds() > stale:
+            continue
+        # DEB/RPM spell 3.1-rc1 as 3.1~rc1 and may append a package revision ('-1')
+        version = re.sub(r'-\d+$', '', (node.version or '').replace('~', '-').strip())
+        if not version or parse_version(version) < floor:
+            behind.append(f"{node.node_id} ({node.version or 'unknown version'})")
+    return sorted(behind)
 
 
 def log_refusal(key_id, addr) -> None:

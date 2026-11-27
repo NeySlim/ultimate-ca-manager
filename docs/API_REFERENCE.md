@@ -430,7 +430,7 @@ address. The address checked is the one UCM resolves for the request, after its 
 From another address the key is refused with `403` (`This API key is not allowed from this address`)
 and its `last_used_at` is not updated. An invalid entry answers `400`. A key created by a limited API
 key gets its networks when none is given, and `403` when one lies outside them; regenerating keeps
-them, under the same rule when a limited API key regenerates another key. Every key in a listing carries `allowed_networks` (`[]` for any address).
+them, under the same rule when a limited API key regenerates another key. Every key in a listing carries `allowed_networks` (`[]` for any address). In HA, creating a key with networks answers `409` while a node with a fresh heartbeat runs a version older than 3.1, which would accept the key from any address; `details.nodes` names those nodes.
 
 The first `DELETE` revokes a key that still works (kept for the audit history); a second one, or one on an expired key, deletes it. A call authenticated by an API key renames (`PATCH`), revokes or deletes itself, or another key of the account only when both the calling key and its owner still hold every scope of that key, as `regenerate` requires (`403` otherwise, a `*` key included when the owner has lost one of them); a session manages every key of its account.
 

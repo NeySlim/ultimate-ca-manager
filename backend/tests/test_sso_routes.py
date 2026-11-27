@@ -235,17 +235,31 @@ class TestSSOProviderValidation:
 
     @pytest.mark.parametrize('name', ['', '   ', None, 5, ['x']])
     def test_update_refuses_a_name_that_is_not_blank_free_text(self, app, auth_client, name):
-        listed = get_json(auth_client.get('/api/v2/sso/providers')).get('data', [])
-        saml = next(p for p in listed if p['name'] == 'Test SAML')
+        # One provider per type: take the one the CRUD classes left, else make one of its own
         from models import SSOProvider, db
-        r = _put(auth_client, f'/api/v2/sso/providers/{saml["id"]}', {'name': name})
-        again = get_json(auth_client.get(f'/api/v2/sso/providers/{saml["id"]}'))['data']
+        listed = get_json(auth_client.get('/api/v2/sso/providers')).get('data', [])
+        own = not listed
+        if own:
+            created = _post(auth_client, '/api/v2/sso/providers', {
+                'name': 'Name Guard SAML', 'provider_type': 'saml', 'enabled': False,
+                'saml_entity_id': 'name-guard', 'saml_sso_url': 'https://idp.example.com/sso',
+                'saml_certificate': 'test',
+            })
+            assert created.status_code in (200, 201), created.data
+            listed = [get_json(created)['data']]
+        provider_id, kept_name = listed[0]['id'], listed[0]['name']
+        r = _put(auth_client, f'/api/v2/sso/providers/{provider_id}', {'name': name})
+        again = get_json(auth_client.get(f'/api/v2/sso/providers/{provider_id}'))['data']
         with app.app_context():
-            db.session.get(SSOProvider, saml['id']).name = 'Test SAML'
+            row = db.session.get(SSOProvider, provider_id)
+            if own:
+                db.session.delete(row)
+            else:
+                row.name = kept_name
             db.session.commit()
         assert r.status_code == 400, r.data
         assert 'Provider name' in get_json(r)['message'], r.data
-        assert again['name'] == 'Test SAML'
+        assert again['name'] == kept_name
 
     def test_create_missing_type(self, auth_client):
         r = _post(auth_client, '/api/v2/sso/providers', {

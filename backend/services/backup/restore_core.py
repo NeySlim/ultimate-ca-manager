@@ -28,6 +28,7 @@ from .export_generic import REFERENCE_SUFFIX
 from .restore import RestorePlan, single_transaction
 from .restore.transaction import checkpoint, expect_rows, tick, ticking
 from .restore import audit_ids
+from .restore.kept_states import held_here, put_back
 from .manifest import SECTIONS
 from .section_store import SectionStore, section_kind, section_length
 from .restore.apply import (apply_columns, apply_section, escape_nul_in_archive,
@@ -163,6 +164,22 @@ GENERIC_SECTIONS = (
 # row it placed until the commit, and a reader of a PEM loads it again from the transaction
 PEM_RELEASE_ROWS = 1000
 _PEM_COLUMNS = ('crt', 'csr', 'prv')
+
+
+def _eab_user_link(eab: Dict, column: str, existing, plan) -> Any:
+    """The user here an EAB link names, by its identity as apply_columns resolves it.
+
+    The source's number names another account here; an archive without identities leaves a
+    new row unlinked and an existing one with its own link.
+    """
+    from .restore_extended import _target_id
+    if existing is not None and f'{column}{REFERENCE_SUFFIX}' not in eab \
+            and eab.get(column) is not None:
+        return getattr(existing, column)
+    resolved = plan.resolve('acme_eab_credentials', eab, column)
+    if resolved is None:
+        resolved = _target_id('acme_eab_credentials', eab, column)
+    return resolved
 
 
 def _release_pems(certificates) -> None:
@@ -471,7 +488,7 @@ class RestoreCoreMixin:
         expect_rows(sum(section_length(backup_data, name) for name in backup_data.keys()
                         if name in RESTORED_SECTIONS and section_kind(backup_data, name) == 'list'))
         checkpoint('plan')
-        plan = RestorePlan.build(backup_data, pruned=pruned)
+        plan = RestorePlan.build(backup_data, pruned=pruned, merging=mode == 'merge')
         plan.warnings.extend(nul_warnings + order_warnings + windows_warnings + sso_warnings)
         for warning in plan.warnings:
             logger.warning("Restore: %s", warning)
@@ -745,7 +762,7 @@ class RestoreCoreMixin:
         self._restore_revoked_serials(backup_data, results, plan)
         self._restore_crl_number_counters(backup_data, results)
         self._restore_acme_accounts(backup_data, results)
-        self._restore_acme_eab_credentials(backup_data, results)
+        self._restore_acme_eab_credentials(backup_data, results, plan)
         self._restore_settings(backup_data, results)
 
         # No commit here: the whole restore is one transaction, so a failure
@@ -1349,13 +1366,18 @@ class RestoreCoreMixin:
                 continue
             existing = AcmeAccount.query.filter_by(account_id=account_id).first()
             target = existing
+            held = held_here('acme_accounts', existing, getattr(self, '_merging', False))
             if existing:
-                existing.jwk = acme_data['jwk']
-                existing.jwk_thumbprint = jwk_thumbprint
+                # RFC 8555 §7.3.5: in a merge the account here is the truth on its key, so a key
+                # rolled over after the archive (often a compromised one) never authenticates again
+                if not getattr(self, '_merging', False):
+                    existing.jwk = acme_data['jwk']
+                    existing.jwk_thumbprint = jwk_thumbprint
                 existing.contact = acme_data.get('contact')
                 existing.status = acme_data.get('status', 'valid')
                 existing.terms_of_service_agreed = acme_data.get('terms_of_service_agreed', False)
                 existing.external_account_binding = acme_data.get('external_account_binding')
+                put_back('acme_accounts', existing, held)
             else:
                 new_acme = AcmeAccount(
                     account_id=account_id,
@@ -1371,7 +1393,7 @@ class RestoreCoreMixin:
             _archived_timestamps(target, f"ACME account {account_id}", acme_data)
             results['acme_accounts'] += 1
 
-    def _restore_acme_eab_credentials(self, backup_data: Dict, results: Dict) -> None:
+    def _restore_acme_eab_credentials(self, backup_data: Dict, results: Dict, plan=None) -> None:
         """Restore ACME EAB credentials from backup data (RFC 8555).
 
         The whole section used to sit inside one `except Exception`, so a
@@ -1383,7 +1405,10 @@ class RestoreCoreMixin:
         from models.acme_models import AcmeEabCredential
 
         results.setdefault('acme_eab_credentials', 0)
-        for eab in backup_data.get('acme_eab_credentials', []):
+        rows = backup_data.get('acme_eab_credentials', [])
+        if rows and plan is None:
+            plan = RestorePlan.build(backup_data)
+        for eab in rows:
             tick(1)   # every row announced by expect_rows is counted, written or left out
             kid = eab.get('kid')
             if not kid or not eab.get('hmac_key_b64'):
@@ -1394,7 +1419,11 @@ class RestoreCoreMixin:
             revoked_at = _archived_datetime(where, 'revoked_at', eab.get('revoked_at'))
             existing = AcmeEabCredential.query.filter_by(kid=kid).first()
             target = existing
+            held = held_here('acme_eab_credentials', existing, getattr(self, '_merging', False))
+            created_by = _eab_user_link(eab, 'created_by_user_id', existing, plan)
+            revoked_by = _eab_user_link(eab, 'revoked_by_user_id', existing, plan)
             if existing:
+                existing.created_by_user_id = created_by
                 existing.hmac_key_b64 = eab['hmac_key_b64']
                 existing.label = eab.get('label')
                 existing.notes = eab.get('notes')
@@ -1402,20 +1431,21 @@ class RestoreCoreMixin:
                 existing.used_at = used_at
                 existing.used_by_account_id = eab.get('used_by_account_id')
                 existing.revoked_at = revoked_at
-                existing.revoked_by_user_id = eab.get('revoked_by_user_id')
+                existing.revoked_by_user_id = revoked_by
                 existing.expires_at = expires_at
+                put_back('acme_eab_credentials', existing, held)
             else:
                 new_eab = AcmeEabCredential(
                     kid=kid,
                     hmac_key_b64=eab['hmac_key_b64'],
                     label=eab.get('label'),
                     notes=eab.get('notes'),
-                    created_by_user_id=eab.get('created_by_user_id'),
+                    created_by_user_id=created_by,
                     expires_at=expires_at,
                     used_at=used_at,
                     used_by_account_id=eab.get('used_by_account_id'),
                     revoked_at=revoked_at,
-                    revoked_by_user_id=eab.get('revoked_by_user_id'),
+                    revoked_by_user_id=revoked_by,
                     status=eab.get('status', 'active'),
                 )
                 db.session.add(new_eab)
