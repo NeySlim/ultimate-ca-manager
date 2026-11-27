@@ -36,11 +36,11 @@ KEPT_STATES = {
     'key_recovery_requests': (lambda row: row.status in ('recovered', 'rejected', 'cancelled'),
                               ('status', 'decided_by', 'decided_by_id', 'decided_at', 'decision_note',
                                'recovered_by', 'recovered_at'), {}),
-    # A request refused, expired or cancelled here never goes back to pending (approved is not kept)
-    'approval_requests': (lambda row: row.status in ('rejected', 'expired', 'cancelled'),
-                          ('status', 'resolved_at', 'approvals'), {}),
-    'scep_requests': (lambda row: row.status == 'rejected',
-                      ('status', 'rejection_reason', 'approved_by', 'approved_at'), {}),
+    # A request decided or closed here never goes back to pending: approved again, it would issue twice
+    'approval_requests': (lambda row: row.status in ('approved', 'rejected', 'expired', 'cancelled'),
+                          ('status', 'resolved_at', 'approvals', 'certificate_id'), {}),
+    'scep_requests': (lambda row: row.status in ('approved', 'rejected'),
+                      ('status', 'rejection_reason', 'approved_by', 'approved_at', 'cert_refid'), {}),
 }
 
 

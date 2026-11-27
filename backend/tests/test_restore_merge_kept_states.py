@@ -4,8 +4,8 @@ Each case takes an archive while the row is live, revokes the row here, merges t
 and expects the revocation to stand; an archive that revokes a row live here still revokes it.
 Tables: SSH certificates (and so their KRL), SSH hosts, cross-certificates, API keys,
 authentication certificates, ACME accounts, EAB credentials (revoked or used), DNS UPDATE keys,
-key recovery requests (recovered, rejected, cancelled), approval requests (rejected, expired,
-cancelled), SCEP requests (rejected). SQLite and PostgreSQL.
+key recovery requests (recovered, rejected, cancelled), approval requests (approved, rejected,
+expired, cancelled), SCEP requests (approved, rejected). SQLite and PostgreSQL.
 """
 import base64
 import copy
@@ -215,6 +215,19 @@ def _make_scep_request():
 
 
 _REJECTED = '[{"user_id": 1, "username": "u", "action": "reject"}]'
+_APPROVED = '[{"user_id": 1, "username": "u", "action": "approve"}]'
+
+
+def _approve_here(row):
+    """Approved, its certificate issued: pending again, a second approval would issue another."""
+    from tests.test_restore_replace_dependents import _authority_row, _certificate_row
+    tag = _tag()
+    issued = _certificate_row(f'kept-approved-{tag}', _authority_row(f'kept-approved-ca-{tag}'))
+    row.status, row.resolved_at, row.approvals, row.certificate_id = 'approved', _WHEN, _APPROVED, issued.id
+
+
+def _approve_scep_here(row):
+    row.status, row.approved_by, row.approved_at, row.cert_refid = 'approved', 't', _WHEN, str(uuid.uuid4())
 
 
 def _set(**values):
@@ -294,6 +307,17 @@ CASES = {
         ('row', _set(status='cancelled', resolved_at=_WHEN)), ('status', 'resolved_at'),
         lambda row: row.status == 'cancelled',
         {'status': 'cancelled', 'resolved_at': '2026-06-01T12:00:00'}),
+    'approval_requests:approved': (
+        'models.policy:ApprovalRequest', ('approval_requests',), _make_approval_request,
+        ('row', _approve_here), ('status', 'resolved_at', 'approvals', 'certificate_id'),
+        lambda row: row.status == 'approved',
+        {'status': 'approved', 'resolved_at': '2026-06-01T12:00:00', 'approvals': _APPROVED}),
+    'scep_requests:approved': (
+        'models.scep:SCEPRequest', ('scep_requests',), _make_scep_request,
+        ('row', _approve_scep_here), ('status', 'approved_by', 'approved_at', 'cert_refid'),
+        lambda row: row.status == 'approved',
+        {'status': 'approved', 'approved_by': 'v', 'approved_at': '2026-06-01T12:00:00',
+         'cert_refid': '00000000-0000-4000-8000-000000000000'}),
     'scep_requests': (
         'models.scep:SCEPRequest', ('scep_requests',), _make_scep_request,
         ('row', _set(status='rejected', rejection_reason='no', approved_by='t', approved_at=_WHEN)),
@@ -432,6 +456,23 @@ def test_an_archive_revoking_a_credential_used_here_keeps_its_use(installation):
                          ('status', 'used_at', 'used_by_account_id', 'revoked_at'))
     assert after == {'status': 'revoked', 'used_at': _WHEN, 'used_by_account_id': 'acct-here',
                      'revoked_at': datetime(2026, 7, 1, 12, 0, 0)}, after
+
+
+def test_a_request_approved_here_is_not_queued_again(installation):
+    """Its approval named the certificate it issued: the archived pending request is that row, kept."""
+    from models.policy import ApprovalRequest
+    row_id = _make_approval_request()
+    master, payload = _archive(('approval_requests',))
+    comment = db.session.get(ApprovalRequest, row_id).requester_comment
+    _revoke_here(ApprovalRequest, row_id, ('row', _approve_here))
+    _row, before = _state(ApprovalRequest, row_id, ('status', 'certificate_id', 'approvals'))
+
+    _merge(master, payload)
+
+    db.session.expire_all()
+    rows = ApprovalRequest.query.filter_by(requester_comment=comment).all()
+    assert [(r.id, r.status, r.certificate_id) for r in rows] == [
+        (row_id, 'approved', before['certificate_id'])]
 
 
 def test_a_merge_keeps_an_account_key_changed_here(installation):

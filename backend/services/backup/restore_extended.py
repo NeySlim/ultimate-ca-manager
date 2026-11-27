@@ -629,6 +629,11 @@ class RestoreExtendedMixin:
             request = _existing_row('approval_requests',
                                     {'certificate_id': certificate_id,
                                      'created_at': created_at}, plan, ar_data)
+            if request is None and certificate_id is None and plan.merging:
+                # Approved here since the archive: the request now names the certificate it issued
+                request = ApprovalRequest.query.filter(
+                    ApprovalRequest.created_at == created_at, ApprovalRequest.status == 'approved',
+                    ApprovalRequest.certificate_id.isnot(None)).order_by(ApprovalRequest.id).first()
             if request is None:
                 # request_type is NOT NULL; apply_columns overwrites it and requester_id
                 request = ApprovalRequest(
