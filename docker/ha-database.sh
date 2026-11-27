@@ -376,10 +376,7 @@ ucm_export_database_path() {
 # FIPS refuses SoftHSM unless UCM_FIPS_ALLOW_SOFTHSM is on, read as fips_mode.refuse_softhsm reads it.
 ucm_fips_refuses_softhsm() {
     [ "${FIPS_REQUESTED:-0}" = 1 ] || return 1
-    local allow="${UCM_FIPS_ALLOW_SOFTHSM:-}"
-    allow="${allow#"${allow%%[![:space:]]*}"}"
-    allow="${allow%"${allow##*[![:space:]]}"}"
-    case "${allow,,}" in
+    case "$(ucm_flag_text "${UCM_FIPS_ALLOW_SOFTHSM:-}")" in
         1|true|yes|on) return 1 ;;
     esac
     return 0
@@ -394,12 +391,9 @@ ucm_softhsm_auto_init() {
     [ "${HSM_AUTO_INIT:-true}" = "true" ]
 }
 
-# SoftHSM token UCM-Default: created when ucm_softhsm_auto_init allows it, its PIN handed to the
-# application (HSM_DEFAULT_PIN, HSM_TOKEN_CREATED). The PIN stays in the data volume until the
-# application has registered the token (auto_register_softhsm removes it): a first start that dies
-# before that hands it again. HA and a FIPS start that refuses SoftHSM keep it unused for a later
-# standard start; once the
-# token is gone it is removed.
+# SoftHSM token UCM-Default, created when ucm_softhsm_auto_init allows it. Its PIN stays in the data
+# volume until the application registers the token, and is handed again to a start that registers it;
+# HA and a FIPS start refusing SoftHSM leave it unused, and it goes once the token is gone.
 ucm_softhsm_default_token() {
     if ! command -v softhsm2-util >/dev/null 2>&1; then
         echo -e "${YELLOW:-}⚠️  SoftHSM not available - HSM features disabled${NC:-}"
