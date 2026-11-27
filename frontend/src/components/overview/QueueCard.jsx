@@ -153,7 +153,7 @@ function Row({ item, actions, hidden }) {
 export function QueueCard({ defaultOpen = false, onToggle }) {
   const { t } = useTranslation()
   const navigate = useNavigate()
-  const state = useCardData(() => overviewService.getQueue(), ['certificate', 'ca', 'truststore'], 'queue')
+  const state = useCardData((o) => overviewService.getQueue(100, { reuse: o?.mount }), ['certificate', 'ca', 'truststore'], 'queue')
   const actions = useRowActions(state.refresh)
   const [open, setOpen] = useState(defaultOpen)
   const [watchOpen, setWatchOpen] = useState(false)

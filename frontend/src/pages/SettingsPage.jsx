@@ -459,7 +459,7 @@ export default function SettingsPage() {
     loadMtlsSettings()
     loadCtSettings()
     loadAutoRenewalSettings()
-    systemService.getServiceStatus().then(r => setIsDocker(r.data?.is_docker || false)).catch(() => {})
+    systemService.getServiceStatus({ reuse: true }).then(r => setIsDocker(r.data?.is_docker || false)).catch(() => {})
   }, [])
 
   // `keep`: keys whose draft survives the reload (a part whose save failed).
@@ -575,7 +575,7 @@ export default function SettingsPage() {
 
   const loadCAs = async () => {
     try {
-      const data = await casService.getAll()
+      const data = await casService.getAll({ reuse: true })
       setCas(data.data || [])
     } catch (error) { reportSilentFailure('loadCAs', error) }
   }

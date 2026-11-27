@@ -169,7 +169,8 @@ export default function ACMEPage() {
   const [eabRequired, setEabRequired] = useState(false)
 
   useEffect(() => {
-    loadData()
+    // The history effect below already asks for its first page
+    loadData({ history: false })
   }, [])
 
   useEffect(() => {
@@ -274,7 +275,7 @@ export default function ACMEPage() {
   // Every page of the history as filtered and sorted on screen, for the table's export
   const exportHistory = useCallback((paging) => acmeService.getHistory(historyParams(paging)), [historyParams])
 
-  const loadData = async () => {
+  const loadData = async ({ history = true } = {}) => {
     setLoading(true)
     setLoadError(null)
     try {
@@ -315,7 +316,7 @@ export default function ACMEPage() {
       setDnsProviderTypes(dnsTypesRes.data || [])
       setAcmeDomains(domainsRes.data || [])
       setLocalDomains(localDomainsRes.data || [])
-      loadHistoryRef.current()
+      if (history) loadHistoryRef.current()
     } catch (error) {
       setLoadError(error)
       showError(error.message || t('messages.errors.loadFailed.acme'))

@@ -20,9 +20,9 @@ export default function ServiceStatusWidget() {
   const [restarting, setRestarting] = useState(false)
   const { reconnecting, status: reconnectStatus, attempt, countdown, waitForRestart, cancel } = useServiceReconnect()
 
-  const fetchStatus = async () => {
+  const fetchStatus = async (opening = false) => {
     try {
-      const response = await systemService.getServiceStatus()
+      const response = await systemService.getServiceStatus({ reuse: opening === true })
       setStatus(response.data)
     } catch {
       setStatus(null)
@@ -32,8 +32,8 @@ export default function ServiceStatusWidget() {
   }
 
   useEffect(() => {
-    fetchStatus()
-    const interval = setInterval(fetchStatus, 30000)
+    fetchStatus(true)
+    const interval = setInterval(() => fetchStatus(), 30000)
     return () => clearInterval(interval)
   }, [])
 

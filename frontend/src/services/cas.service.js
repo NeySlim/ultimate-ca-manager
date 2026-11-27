@@ -3,10 +3,12 @@
  */
 import { apiClient, buildQueryString } from './apiClient'
 import { runInBatches } from '../lib/bulkChunks'
+import { OPENING_REUSE_MS, sharedRequest } from '../lib/sharedRequest'
 
 export const casService = {
-  async getAll() {
-    return apiClient.get('/cas')
+  // `reuse`: a screen opening may take the list another one just read
+  async getAll({ reuse = false } = {}) {
+    return sharedRequest('cas', () => apiClient.get('/cas'), { reuseMs: reuse ? OPENING_REUSE_MS : 0 })
   },
 
   async getById(id) {

@@ -3,25 +3,33 @@
  */
 import { apiClient, buildQueryString } from './apiClient'
 import { WATCH_KINDS } from '../lib/overviewQueue'
+import { sharedRequest } from '../lib/sharedRequest'
+
+// A card opening just after the shell read the queue takes that answer instead of asking again
+const QUEUE_REUSE_MS = 3000
 
 const key = (item) => `${item.kind}-${item.id}`
+
+async function readQueue(limit) {
+  const res = await apiClient.get(`/dashboard/queue${buildQueryString({ limit })}`)
+  const data = res?.data
+  const items = Array.isArray(data?.items) ? data.items : null
+  if (!items || typeof data.total !== 'number' || items.length >= data.total) return res
+  const counted = WATCH_KINDS.reduce((sum, kind) => sum + (Number(data.counts?.[kind]) || 0), 0)
+  if (counted <= items.filter((i) => WATCH_KINDS.includes(i.kind)).length) return res
+  const watch = await apiClient.get(`/dashboard/queue${buildQueryString({ limit, kind: WATCH_KINDS })}`)
+  const listed = new Set(items.map(key))
+  const more = (Array.isArray(watch?.data?.items) ? watch.data.items : []).filter((i) => !listed.has(key(i)))
+  return { ...res, data: { ...data, items: [...items, ...more] } }
+}
 
 export const overviewService = {
   /**
    * The queue, critical first then by due date, at most `limit` rows; past the limit the interventions fill it, so the
    * rows only to watch that its counts name are asked apart and added after them.
    */
-  async getQueue(limit = 100) {
-    const res = await apiClient.get(`/dashboard/queue${buildQueryString({ limit })}`)
-    const data = res?.data
-    const items = Array.isArray(data?.items) ? data.items : null
-    if (!items || typeof data.total !== 'number' || items.length >= data.total) return res
-    const counted = WATCH_KINDS.reduce((sum, kind) => sum + (Number(data.counts?.[kind]) || 0), 0)
-    if (counted <= items.filter((i) => WATCH_KINDS.includes(i.kind)).length) return res
-    const watch = await apiClient.get(`/dashboard/queue${buildQueryString({ limit, kind: WATCH_KINDS })}`)
-    const listed = new Set(items.map(key))
-    const more = (Array.isArray(watch?.data?.items) ? watch.data.items : []).filter((i) => !listed.has(key(i)))
-    return { ...res, data: { ...data, items: [...items, ...more] } }
+  getQueue(limit = 100, { reuse = false } = {}) {
+    return sharedRequest(`dashboard/queue:${limit}`, () => readQueue(limit), { reuseMs: reuse ? QUEUE_REUSE_MS : 0 })
   },
   getHealth(days = 7) {
     return apiClient.get(`/dashboard/health${buildQueryString({ days })}`)

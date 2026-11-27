@@ -42,11 +42,15 @@ export function useCardData(fetcher, watch = [], shareKey = null) {
   // The latest render's fetcher and page: a card whose request depends on its state reloads with it
   const latest = useRef({})
   latest.current = { fetcher, share: shareKey && page?.share ? (run) => page.share(shareKey, run) : null }
+  const mounted = useRef(false)
   const load = useCallback(async (quiet = false) => {
+    // The opening read may take an answer another reader just got; later ones always ask
+    const mount = !mounted.current
+    mounted.current = true
     const mine = ++seq.current
     if (!quiet) setState((s) => ({ status: 'loading', data: s.data }))
     try {
-      const run = () => latest.current.fetcher()
+      const run = () => latest.current.fetcher({ mount })
       const res = await (latest.current.share ? latest.current.share(run) : run())
       if (mine === seq.current) setState({ status: 'ready', data: res?.data ?? null, meta: res?.meta ?? null })
     } catch (error) {

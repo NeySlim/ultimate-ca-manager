@@ -16,7 +16,7 @@ export default function XcepWstepSection({ hasPermission }) {
 
   useEffect(() => {
     let cancelled = false
-    casService.getAll()
+    casService.getAll({ reuse: true })
       .then(response => { if (!cancelled) setCas(response.data || []) })
       .catch(() => {})
     return () => { cancelled = true }

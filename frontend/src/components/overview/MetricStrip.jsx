@@ -68,7 +68,7 @@ export function MetricStrip({ showQueue }) {
   const lang = useLang()
   const tip = useChartTip()
   const statsState = useCardData(() => dashboardService.getStats(), ['certificate', 'ca'], 'stats')
-  const queueState = useCardData(() => overviewService.getQueue(), ['certificate', 'ca', 'truststore'], 'queue')
+  const queueState = useCardData((o) => overviewService.getQueue(100, { reuse: o?.mount }), ['certificate', 'ca', 'truststore'], 'queue')
   const healthState = useCardData(() => overviewService.getHealth(HEALTH_DAYS), ['certificate'], 'health')
   const issuanceState = useCardData(() => overviewService.getIssuance(ISSUANCE_DAYS), ['certificate', 'ca'], 'issuance')
   const expiryState = useCardData(() => overviewService.getExpirations(EXPIRY_DAYS), ['certificate', 'ca'], 'expirations-30')

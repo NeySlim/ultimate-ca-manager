@@ -1,9 +1,10 @@
 import '@testing-library/jest-dom'
 import { vi, afterEach } from 'vitest'
 import { dropAllDrafts } from '../lib/draftMemory'
+import { dropSharedRequests } from '../lib/sharedRequest'
 
 // Drafts kept for the tab live in module memory: none passes from one test to the next
-afterEach(() => dropAllDrafts())
+afterEach(() => { dropAllDrafts(); dropSharedRequests() })
 
 // Mock window.matchMedia
 Object.defineProperty(window, 'matchMedia', {
