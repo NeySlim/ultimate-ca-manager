@@ -230,6 +230,21 @@ def test_the_public_route_serves_a_stored_description_as_text(app, auth_client, 
         db.session.commit()
 
 
+
+def test_the_public_routes_name_the_file_in_ascii(app, auth_client):
+    """A header carries latin-1 only: a description beyond it still names the file."""
+    r = _create(auth_client, 'G\u0142\u00f3wny "CA"')
+    assert r.status_code == 201, r.data
+    ca = get_json(r)['data']
+    client = app.test_client()
+    for url in (f"/ssh/setup/{ca['refid']}", f"/ssh/setup/{ca['refid']}?platform=windows",
+                f"/ssh/setup/{ca['refid']}/public-key"):
+        header = client.get(url).headers['Content-Disposition']
+        assert header.isascii() and header.count('"') == 2, (url, header)
+    with app.app_context():
+        db.session.delete(db.session.get(SSHCertificateAuthority, ca['id']))
+        db.session.commit()
+
 @pytest.mark.parametrize('bad', ['two\nlines', 'tab\there', 'cr\rhere', 'nul\x00here', 'sep here'])
 def test_a_description_with_a_control_character_is_refused(app, auth_client, bad):
     assert _create(auth_client, bad).status_code == 400

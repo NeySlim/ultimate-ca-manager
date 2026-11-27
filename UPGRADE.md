@@ -162,7 +162,7 @@ Database migrations run automatically at startup.
 
 ### An SSH CA description is one line of text
 
-`POST /api/v2/ssh/cas`, `PUT /api/v2/ssh/cas/{ca_id}` and `POST /api/v2/ssh/cas/import` now answer `400` for a `descr` holding a control character or a line break. A description stored before keeps working: the setup scripts print it on one line, and saving it again from the CA's panel needs those characters removed.
+`POST /api/v2/ssh/cas`, `PUT /api/v2/ssh/cas/{ca_id}` and `POST /api/v2/ssh/cas/import` now answer `400` for a `descr` holding a control character or a line break inside it (one at either end is trimmed, as before). A description stored before keeps working: the setup scripts print it on one line, and saving it again from the CA's panel needs those characters removed.
 
 ### Export requests with a password in the wrong place are refused
 
