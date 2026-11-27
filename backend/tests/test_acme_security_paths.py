@@ -858,6 +858,13 @@ class TestRfc8555StateMachine:
             class Response:
                 text = 'wrong-key-authorization'
                 status_code = 200
+                headers = {}
+
+                def iter_content(self, chunk_size=1):
+                    yield self.text.encode()
+
+                def close(self):
+                    pass
 
                 @staticmethod
                 def raise_for_status():
@@ -1258,6 +1265,7 @@ class TestKeyChangeConflict:
             )
             db.session.add(victim)
             db.session.commit()
+            victim_id = victim.account_id
 
         attacker_key = acme_account['key']
         attacker_jwk = acme_account['jwk']
@@ -1285,6 +1293,8 @@ class TestKeyChangeConflict:
                         data=json.dumps(outer),
                         content_type='application/jose+json')
         assert r.status_code == 409, r.get_data(as_text=True)
+        # RFC 8555 §7.3.5: the 409 names the account that holds the new key
+        assert r.headers.get('Location', '').endswith(f'/acme/acct/{victim_id}')
 
         # Attacker key must be unchanged.
         with app.app_context():

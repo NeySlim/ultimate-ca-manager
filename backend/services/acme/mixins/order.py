@@ -190,9 +190,10 @@ class OrderMixin:
                     wildcard=is_wildcard,
                     expires=utc_now() + timedelta(days=7),
                 )
+                # No challenge was performed, so none is listed (RFC 8555
+                # §7.1.4) and CAA validationmethods cannot match it (RFC 8657 §4).
                 db.session.add(auth)
                 db.session.flush()
-                self._create_challenges(auth, status='valid', validated=utc_now())
                 try:
                     db.session.commit()
                 except Exception as e:
@@ -311,9 +312,9 @@ class OrderMixin:
         db.session.add(auth)
         db.session.flush()
         
-        if skip_challenges:
-            self._create_challenges(auth, status='valid', validated=utc_now())
-        else:
+        # Auto-approved: no challenge was performed, so none is listed (RFC 8555
+        # §7.1.4) and an order reusing it claims no CAA validation method (RFC 8657 §4).
+        if not skip_challenges:
             self._create_challenges(auth, status="pending")
         
         try:
@@ -407,7 +408,7 @@ class OrderMixin:
             copied.append(copy)
         return copied
 
-    def _create_challenges(self, auth: AcmeAuthorization, status: str, validated: datetime = None):
+    def _create_challenges(self, auth: AcmeAuthorization, status: str):
         """Helper to create standard challenges for an authorization.
 
         RFC 8555 §7.1.3 / §8.4: wildcard identifiers (``*.example.com``)
@@ -435,7 +436,6 @@ class OrderMixin:
                 status=status,
                 token=dns_token,
                 url=f"{self.base_url}/acme/challenge/{secrets.token_urlsafe(16)}",
-                validated=validated
             )
             auth.challenges.append(dns_challenge)
 
@@ -452,7 +452,6 @@ class OrderMixin:
                         status=status,
                         token=secrets.token_urlsafe(32),
                         url=f"{self.base_url}/acme/challenge/{secrets.token_urlsafe(16)}",
-                        validated=validated
                     )
                     auth.challenges.append(persist_challenge)
 
@@ -469,7 +468,6 @@ class OrderMixin:
             status=status,
             token=http_token,
             url=f"{self.base_url}/acme/challenge/{secrets.token_urlsafe(16)}",
-            validated=validated
         )
         auth.challenges.append(http_challenge)
 
@@ -481,7 +479,6 @@ class OrderMixin:
             status=status,
             token=tls_token,
             url=f"{self.base_url}/acme/challenge/{secrets.token_urlsafe(16)}",
-            validated=validated
         )
         auth.challenges.append(tls_challenge)
     

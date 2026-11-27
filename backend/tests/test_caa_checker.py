@@ -162,13 +162,30 @@ class TestIssueMatching:
         assert ok is False
         assert 'validationmethods' in reason
 
-    def test_validationmethods_with_indeterminable_method_allows(self):
-        # Reused/auto-approved authorizations have no single determinable
-        # challenge type — the parameter is not enforced in that case.
+    def test_validationmethods_without_a_validation_method_denies(self):
+        # RFC 8657 §4: only a listed method authorizes; an auto-approved
+        # authorization used none, so the property cannot authorize it.
         rec = _FakeCAA('issue', 'ucm.example.com; validationmethods=dns-01')
         with _patch({'example.com': [rec]}):
-            ok, _ = check_caa('www.example.com', ['ucm.example.com'])
+            ok, reason = check_caa('www.example.com', ['ucm.example.com'])
+        assert ok is False
+        assert 'validationmethods' in reason
+
+    def test_validationmethods_allows_several_methods_all_listed(self):
+        # Two challenges validated concurrently: each method used must be listed.
+        rec = _FakeCAA('issue', 'ucm.example.com; validationmethods=http-01,dns-01')
+        with _patch({'example.com': [rec]}):
+            ok, _ = check_caa('www.example.com', ['ucm.example.com'],
+                              validation_method=('dns-01', 'http-01'))
         assert ok is True
+
+    def test_validationmethods_denies_several_methods_one_unlisted(self):
+        rec = _FakeCAA('issue', 'ucm.example.com; validationmethods=dns-01')
+        with _patch({'example.com': [rec]}):
+            ok, reason = check_caa('www.example.com', ['ucm.example.com'],
+                                   validation_method=('dns-01', 'http-01'))
+        assert ok is False
+        assert 'validationmethods' in reason
 
     def test_validationmethods_with_wrong_method_denies(self):
         rec = _FakeCAA('issue', 'ucm.example.com; validationmethods=dns-01')
@@ -248,18 +265,24 @@ class TestTreeClimb:
         assert ok is False
         assert 'example.com' in reason
 
-    def test_tld_is_not_queried(self):
+    def test_every_ancestor_short_of_the_root_is_queried(self):
+        # RFC 8659 §3: the search climbs to the top label, never to the root.
         seen = []
 
         def _resolve(name, rdtype):
-            seen.append(str(name).rstrip('.'))
+            seen.append(str(name))
             raise dns.resolver.NXDOMAIN()
 
         with patch('dns.resolver.resolve', side_effect=_resolve):
             check_caa('www.example.com', ['ucm.example.com'])
-        assert 'com' not in seen
-        assert 'example.com' in seen
-        assert 'www.example.com' in seen
+        assert seen == ['www.example.com', 'example.com', 'com']
+
+    def test_single_label_zone_apex_record_applies(self):
+        rec = _FakeCAA('issue', ';')
+        with _patch({'internal': [rec]}):
+            ok, reason = check_caa('app.internal', ['ucm.example.com'])
+        assert ok is False
+        assert 'denies all issuance' in reason
 
 
 class TestWildcard:
@@ -325,7 +348,7 @@ class TestIssuanceContext:
         assert account_url == 'https://ca.example/acme/acct/account-1'
         assert methods == {'www.example.com': 'http-01'}
 
-    def test_ambiguous_valid_methods_fail_closed(self):
+    def test_every_valid_method_is_reported(self):
         from services.acme.mixins.issuance import IssuanceMixin
 
         authorization = SimpleNamespace(
@@ -345,7 +368,7 @@ class TestIssuanceContext:
 
         _, methods = mixin._caa_request_context(order)
 
-        assert methods == {'*.example.com': None}
+        assert methods == {'*.example.com': ('dns-01', 'http-01')}
 
 
 class TestMultipleDomains:

@@ -2072,8 +2072,11 @@ def key_change():
             AcmeAccount.account_id != account.account_id,
         ).first()
         if conflict:
-            return acme_error('malformed',
-                              'New key is already in use by another account', 409)
+            response = acme_error('malformed',
+                                  'New key is already in use by another account', 409)
+            # §7.3.5: the 409 SHOULD carry the URL of the account holding the key
+            response.headers['Location'] = f"{service.base_url}/acme/acct/{conflict.account_id}"
+            return response
 
         # Update account JWK
         try:

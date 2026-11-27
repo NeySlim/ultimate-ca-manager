@@ -716,6 +716,12 @@ def test_a_redirect_hop_is_pinned_under_the_default_policy(monkeypatch, dns_priv
             self.status_code = status
             self.headers = {'Location': location} if location else {}
 
+        def iter_content(self, chunk_size=1):
+            yield b''
+
+        def close(self):
+            pass
+
     def _get(url, **_kw):
         pinned.append(dict(getattr(ssrf_protection._pinned_resolution, 'host_to_ip', None) or {}))
         if len(pinned) == 1:
