@@ -1,7 +1,8 @@
 """TLS-ALPN-01 validation (RFC 8737) is bounded in real time, as HTTP-01 is.
 
-A challenge server under the ACME account's control can drip its handshake one byte
-at a time, each within the per-read timeout: only a total deadline frees the worker.
+A name resolving to many addresses that never answer held a worker one connect timeout per
+address: the connections and the handshake now share one total deadline. CPython already bounds
+a whole do_handshake by the socket timeout, so a dripped handshake ends without that deadline.
 """
 import json
 import socket
@@ -84,13 +85,14 @@ def _validate(app, monkeypatch, port, unreachable):
 
 
 def test_addresses_that_never_answer_share_one_deadline(app, monkeypatch, dripping_server):
-    # A name can resolve to many addresses: each connect attempt is bounded, their sum was not
+    """The proof of the total deadline: each connect attempt is bounded, their sum was not."""
     elapsed, detail = _validate(app, monkeypatch, dripping_server, unreachable=8)
     assert elapsed < 5, elapsed
     assert 'in time' in detail
 
 
 def test_a_dripped_handshake_ends_by_the_deadline(app, monkeypatch, dripping_server):
+    """Guard, not a proof of the deadline: the socket timeout alone already ends this handshake."""
     elapsed, detail = _validate(app, monkeypatch, dripping_server, unreachable=0)
     assert elapsed < 5, elapsed
     assert 'in time' in detail
