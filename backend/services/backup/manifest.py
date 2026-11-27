@@ -513,6 +513,7 @@ SECTIONS: Dict[str, Section] = {
         exclude={**_SURROGATE},
         # `cert_id` is no reference: the restorer points it at the certificate
         # of `cert_refid` here, and cancels an open request whose certificate is not.
+        references={'requested_by_id': 'users', 'decided_by_id': 'users'},
     ),
     'audit_logs': Section(
         model='models.audit_log:AuditLog',

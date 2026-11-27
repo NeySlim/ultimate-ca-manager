@@ -2483,7 +2483,7 @@ Opens a request (`201`). `reason` is required and at most 2000 characters; `400`
 GET /api/v2/key-recovery?status=pending
 GET /api/v2/key-recovery/{id}
 ```
-The list returns `requests` and `dual_control`, whether the approver must differ from the requester; it pages with `page` and `per_page` (default 500, 500 at most), `meta` carries `total`, and it sorts by `sort_by`: `id` (default, newest first), `requested_at`, `status` (pending, approved, recovered, rejected, cancelled), `cert_cn`, `requested_by` (see [Sorting](#sorting)). `GET /{id}` reads one request whatever its age. A request carries `requested_by` and `decided_by`, the account names, and `requested_by_id` and `decided_by_id`, their account ids (`null` on a request opened before 3.1).
+The list returns `requests` and `dual_control`, whether the approver must differ from the requester; it pages with `page` and `per_page` (default 500, 500 at most), `meta` carries `total`, and it sorts by `sort_by`: `id` (default, newest first), `requested_at`, `status` (pending, approved, recovered, rejected, cancelled), `cert_cn`, `requested_by` (see [Sorting](#sorting)). `GET /{id}` reads one request whatever its age. A request carries `requested_by` and `decided_by`, the account names, and `requested_by_id` and `decided_by_id`, their account ids (`null` on a request opened before 3.1, and once that account is deleted; a restore points them at the account of the same username, or leaves them `null`).
 
 ```http
 POST /api/v2/key-recovery/{id}/approve

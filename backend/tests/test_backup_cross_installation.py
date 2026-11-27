@@ -671,8 +671,8 @@ def _seed_source():
         scan_profile_id=scan_profiles[1].id, ucm_certificate_id=leaves[1].id)
 
     add('key_recovery_requests', cert_id=leaves[1].id, cert_refid='xinst-cert-b',
-        reason='xinst', requested_by='xinst-user-b', requested_at=now,
-        status='pending')
+        reason='xinst', requested_by='xinst-user-b', requested_by_id=users[1].id,
+        decided_by_id=users[1].id, requested_at=now, status='pending')
 
     # -- the sections that carry only secrets -------------------------------
     smtp = add('smtp_config', smtp_host='smtp.example.test', smtp_port=587,

@@ -108,12 +108,15 @@ def test_an_account_reusing_a_deleted_requesters_name_cannot_collect(app, auth_c
     with app.app_context():
         old_id = User.query.filter_by(username='kr_reused').one().id
     assert auth_client.delete(f'/api/v2/users/{old_id}').status_code in (200, 204)
+    with app.app_context():
+        assert db.session.get(KeyRecoveryRequest, rid).requested_by_id is None
     create_user(username='kr_reused', role='operator', email='kr-second@test.local')
     with app.app_context():
         assert User.query.filter_by(username='kr_reused').one().id != old_id
     r = _post(_signed_in(app, 'kr_reused'), f'/api/v2/key-recovery/{rid}/recover', PW)
     assert r.status_code == 403, r.data
     assert _status(app, rid) == 'approved'
+    assert _post(auth_client, f'/api/v2/key-recovery/{rid}/recover', PW).status_code == 200
 
 
 def test_the_requester_collects_and_both_ids_are_kept(app, auth_client, create_user, create_cert):

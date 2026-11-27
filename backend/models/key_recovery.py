@@ -33,11 +33,12 @@ class KeyRecoveryRequest(db.Model):
 
     requested_by = db.Column(db.String(120), nullable=False)
     requested_at = db.Column(db.DateTime, default=utc_now, nullable=False)
-    # Who asked and who decided, by account id: a later account may reuse a deleted one's name
-    requested_by_id = db.Column(db.Integer)
+    # Who asked and who decided, by account id: a later account may reuse a deleted one's name.
+    # A deleted account leaves NULL, which only an administrator's permission collects.
+    requested_by_id = db.Column(db.Integer, db.ForeignKey('users.id', ondelete='SET NULL'))
 
     decided_by = db.Column(db.String(120))
-    decided_by_id = db.Column(db.Integer)
+    decided_by_id = db.Column(db.Integer, db.ForeignKey('users.id', ondelete='SET NULL'))
     decided_at = db.Column(db.DateTime)
     decision_note = db.Column(db.Text)
 

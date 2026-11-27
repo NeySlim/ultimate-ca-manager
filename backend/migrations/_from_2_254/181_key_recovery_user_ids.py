@@ -1,7 +1,8 @@
 """Upgrade step 181: key recovery requests name their requester and approver by account id.
 
-Two nullable INTEGER columns on key_recovery_requests; NULL for the requests written before it,
-which no name lookup fills in (a later account may hold the name). Idempotent, dual-backend.
+Two nullable INTEGER columns on key_recovery_requests, naming users(id) ON DELETE SET NULL; NULL
+for the requests written before it, which no name lookup fills in (a later account may hold the
+name). Idempotent, dual-backend.
 """
 import logging
 import sqlite3
@@ -11,6 +12,7 @@ pg_compatible = True
 
 REQUESTS = 'key_recovery_requests'
 COLUMNS = ('requested_by_id', 'decided_by_id')
+DEFINITION = 'INTEGER REFERENCES users(id) ON DELETE SET NULL'
 
 
 def upgrade(conn):
@@ -20,7 +22,7 @@ def upgrade(conn):
             return
         for column in COLUMNS:
             if column not in present:
-                conn.execute(f"ALTER TABLE {REQUESTS} ADD COLUMN {column} INTEGER")
+                conn.execute(f"ALTER TABLE {REQUESTS} ADD COLUMN {column} {DEFINITION}")
                 logger.info(f"[181] {REQUESTS}.{column} added (SQLite)")
         conn.commit()
         return
@@ -31,7 +33,7 @@ def upgrade(conn):
     present = {c['name'] for c in inspector.get_columns(REQUESTS)}
     for column in COLUMNS:
         if column not in present:
-            conn.execute(text(f"ALTER TABLE {REQUESTS} ADD COLUMN {column} INTEGER"))
+            conn.execute(text(f"ALTER TABLE {REQUESTS} ADD COLUMN {column} {DEFINITION}"))
             logger.info(f"[181] {REQUESTS}.{column} added (PostgreSQL)")
 
 
