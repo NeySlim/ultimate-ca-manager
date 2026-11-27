@@ -430,6 +430,8 @@ export default function CertificatesPage() {
         const blob = await certificatesService.bulkExport(list.map((c) => c.id), 'pem')
         if (blob) downloadBlob(blob, 'certificates_export.pem')
         showSuccess(t('certificates.bulkExported', { count: blob?.exportedCount ?? list.length }))
+        // The cap first: the skipped certificates, said last, stay on screen
+        if (every && total > EXPORT_MAX) showWarning(t('table.exportTruncated', { count: EXPORT_MAX, total }))
         warnSkippedExport(blob, t, showWarning)
       } else {
         const data = list.map(metadata)
@@ -437,7 +439,7 @@ export default function CertificatesPage() {
         else exportToJSON(data, 'certificates')
       }
       // Every result is read up to EXPORT_MAX, whatever the format: say what was left out
-      if (every && total > EXPORT_MAX) showWarning(t('table.exportTruncated', { count: EXPORT_MAX, total }))
+      if (format !== 'pem' && every && total > EXPORT_MAX) showWarning(t('table.exportTruncated', { count: EXPORT_MAX, total }))
       setDialog(null)
     } catch (err) {
       showError(err?.status ? err.message : t('messages.errors.exportFailed.certificate'))

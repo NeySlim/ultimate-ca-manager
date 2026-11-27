@@ -1036,7 +1036,7 @@ export default function SettingsPage() {
       URL.revokeObjectURL(url)
       setBackupKeyDownloaded(true)
     } catch (e) {
-      showError(t('settings.masterKeyDownloadFailed'))
+      showError(e?.message || t('settings.masterKeyDownloadFailed'))
     }
   }
 
@@ -1625,8 +1625,8 @@ export default function SettingsPage() {
   const handleCancelBackup = async () => {
     try {
       await cancelBackupJob()
-    } catch {
-      showError(t('settings.backupCancelFailed'))
+    } catch (e) {
+      showError(e?.message || t('settings.backupCancelFailed'))
     }
   }
 
