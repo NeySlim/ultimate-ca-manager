@@ -23,6 +23,22 @@ class _Handler(http.server.BaseHTTPRequestHandler):
     def do_GET(self):
         self.send_response(404 if self.mode == 'big404' else 200)
         self.send_header('Content-Type', 'text/plain')
+        if self.mode in ('drip_length', 'drip_close'):
+            # Not chunked: a read of N bytes would wait for all N, or for EOF.
+            if self.mode == 'drip_length':
+                self.send_header('Content-Length', '40')
+            else:
+                self.send_header('Connection', 'close')
+            self.end_headers()
+            try:
+                for _ in range(40):
+                    self.wfile.write(b'A')
+                    self.wfile.flush()
+                    time.sleep(0.5)
+            except (BrokenPipeError, ConnectionResetError):
+                pass
+            self.close_connection = True
+            return
         self.send_header('Transfer-Encoding', 'chunked')
         self.end_headers()
         try:
@@ -73,6 +89,16 @@ def test_http01_dripped_body_hits_the_total_deadline(challenge_server):
     with pytest.raises(requests.Timeout):
         http01.fetch_following_redirects(url, None, allow_private=True, timeout=1)
     assert time.monotonic() - started < 6
+
+
+@pytest.mark.parametrize('mode', ['drip_length', 'drip_close'])
+def test_http01_unchunked_dripped_body_hits_the_total_deadline(challenge_server, mode):
+    # Each byte arrives within the per-read timeout; only the total deadline stops it.
+    url = challenge_server(mode)
+    started = time.monotonic()
+    with pytest.raises(requests.Timeout):
+        http01.fetch_following_redirects(url, None, allow_private=True, timeout=1)
+    assert time.monotonic() - started < 5
 
 
 def test_http01_key_authorization_is_still_read(challenge_server):

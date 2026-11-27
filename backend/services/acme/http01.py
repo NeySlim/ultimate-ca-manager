@@ -48,7 +48,9 @@ def _read_bounded(response, deadline: float):
         if response.status_code in REDIRECT_STATUSES or response.status_code >= 400:
             response._content = b''
             return response
-        for chunk in response.iter_content(chunk_size=256):
+        # One byte per read: a read returns as soon as data arrives, so the deadline
+        # is checked at least once per socket timeout, whatever the framing.
+        for chunk in response.iter_content(chunk_size=1):
             body += chunk
             if len(body) > MAX_BODY_BYTES:
                 raise ResponseTooLarge(f'http-01 response larger than {MAX_BODY_BYTES} bytes')
