@@ -4546,6 +4546,7 @@
       "checkTitle": "Verificação de atualizações",
       "checking": "Procurando atualizações…",
       "installed": "Versão instalada",
+      "lastChecked": "Última verificação",
       "latest": "Versão mais recente",
       "published": "Publicada",
       "noReleases": "Nenhuma versão encontrada.",

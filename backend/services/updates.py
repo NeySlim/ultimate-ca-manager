@@ -6,6 +6,7 @@ import os
 import platform
 import re
 import logging
+from datetime import datetime, timezone
 from pathlib import Path
 
 import time
@@ -14,6 +15,7 @@ import requests
 
 from config.settings import Config, DATA_DIR
 from utils.config_cas import config_compare_and_set
+from utils.datetime_utils import utc_isoformat
 
 logger = logging.getLogger('ucm.updates')
 
@@ -53,8 +55,12 @@ def versions_match(detected, target):
     base = re.sub(r'-\d+$', '', d)
     return d == t or base == t
 
-# Simple cache to avoid GitHub rate limits (5 min TTL)
-_releases_cache = {'data': None, 'ts': 0, 'ttl': 300}
+# Per-process cache of the releases list (5 min TTL for install and the automatic check) and of
+# the last failed fetch; each HA node keeps its own. The Settings screen reads it up to
+# UI_CHECK_MAX_AGE old, a failure up to FAILURE_MEMO_TTL, and says how old the answer is.
+_releases_cache = {'data': None, 'ts': 0, 'ttl': 300, 'error': None, 'error_ts': 0}
+UI_CHECK_MAX_AGE = 6 * 3600
+FAILURE_MEMO_TTL = 900
 
 
 _EL_TAG = re.compile(r'\.el(\d+)\.')
@@ -214,6 +220,8 @@ def invalidate_update_cache():
     """Invalidate the releases cache to force a fresh fetch"""
     _releases_cache['data'] = None
     _releases_cache['ts'] = 0
+    _releases_cache['error'] = None
+    _releases_cache['error_ts'] = 0
 
 
 def _pick_asset(release, version):
@@ -261,7 +269,7 @@ def _major_upgrade(releases, current):
 
 
 def check_for_updates(include_prereleases=False, include_dev=False, force=False,
-                      channel=None):
+                      channel=None, max_age=None):
     """
     Check GitHub for available updates
 
@@ -269,6 +277,9 @@ def check_for_updates(include_prereleases=False, include_dev=False, force=False,
         include_prereleases: Include alpha, beta, rc versions
         include_dev: Include dev versions (implies include_prereleases)
         force: Bypass cache
+        max_age: Seconds a cached answer may be served for (the cache TTL when None);
+            a failed fetch is also served from memory for FAILURE_MEMO_TTL when given.
+            Every result carries checked_at, the time GitHub was last asked.
         channel: Strict release channel ('stable' | 'rc') used by the
             automatic check. Overrides include_prereleases: 'stable' accepts
             final releases only, 'rc' accepts final releases plus rcN
@@ -296,8 +307,18 @@ def check_for_updates(include_prereleases=False, include_dev=False, force=False,
     try:
         # Get releases from GitHub API (with cache to avoid rate limits)
         now = time.time()
-        if not force and _releases_cache['data'] and (now - _releases_cache['ts']) < _releases_cache['ttl']:
+        fresh_for = _releases_cache['ttl'] if max_age is None else max_age
+        if not force and _releases_cache['data'] and (now - _releases_cache['ts']) < fresh_for:
             releases = _releases_cache['data']
+        elif (not force and max_age is not None and _releases_cache['error']
+              and (now - _releases_cache['error_ts']) < FAILURE_MEMO_TTL):
+            return {
+                **base,
+                'update_available': False,
+                'current_version': current,
+                'error': _releases_cache['error'],
+                'checked_at': utc_isoformat(datetime.fromtimestamp(_releases_cache['error_ts'], timezone.utc)),
+            }
         else:
             url = f"https://api.github.com/repos/{repo}/releases"
             headers = {'Accept': 'application/vnd.github.v3+json'}
@@ -305,19 +326,20 @@ def check_for_updates(include_prereleases=False, include_dev=False, force=False,
             github_token = os.environ.get('GITHUB_TOKEN') or os.environ.get('UCM_GITHUB_TOKEN')
             if github_token:
                 headers['Authorization'] = f'token {github_token}'
-            
-            try:
-                # The page of 100 (30 by default), newest first: the releases of a later major
-                # must not push this major's fixes off it
-                response = requests.get(url, headers=headers, params={'per_page': 100},
-                                        timeout=10, verify=_ca_bundle or True)
-                response.raise_for_status()
-                releases = response.json()
-                _releases_cache['data'] = releases
-                _releases_cache['ts'] = now
-            except requests.exceptions.HTTPError as e:
-                raise
-        
+
+            # The page of 100 (30 by default), newest first: the releases of a later major
+            # must not push this major's fixes off it
+            response = requests.get(url, headers=headers, params={'per_page': 100},
+                                    timeout=10, verify=_ca_bundle or True)
+            response.raise_for_status()
+            releases = response.json()
+            _releases_cache['data'] = releases
+            _releases_cache['ts'] = now
+            _releases_cache['error'] = None
+            _releases_cache['error_ts'] = 0
+        checked_at = utc_isoformat(datetime.fromtimestamp(_releases_cache['ts'], timezone.utc))
+        base['checked_at'] = checked_at
+
         if not releases:
             return {
                 **base,
@@ -403,11 +425,16 @@ def check_for_updates(include_prereleases=False, include_dev=False, force=False,
         }
         
     except requests.RequestException as e:
+        message = f'Failed to check for updates: {str(e)}'
+        failed_at = time.time()
+        _releases_cache['error'] = message
+        _releases_cache['error_ts'] = failed_at
         return {
             **base,
             'update_available': False,
             'current_version': current,
-            'error': f'Failed to check for updates: {str(e)}'
+            'error': message,
+            'checked_at': utc_isoformat(datetime.fromtimestamp(failed_at, timezone.utc)),
         }
 
 

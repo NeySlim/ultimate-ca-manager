@@ -8,7 +8,7 @@ import { ServiceReconnectOverlay } from '../components'
 import { Btn, Facts, Pill, RecordList, RecordRow } from './atelier'
 import { Select, Notice } from './atelier/Form'
 import { SettingsGroup } from './atelier/SettingsView'
-import { compactAgo } from '../lib/relativeTime'
+import { compactAgo, compactRun } from '../lib/relativeTime'
 import { apiClient } from '../services'
 import { useNotification } from '../contexts'
 import { useServiceReconnect, UPDATE_MAX_WAIT_MS } from '../hooks'
@@ -190,6 +190,7 @@ export function UpdateChecker() {
       )}>
         <Facts items={[
           updateInfo?.current_version ? [t('settings.updates.installed'), updateInfo.current_version] : { label: t('settings.updates.installed'), absent: '—' },
+          updateInfo?.checked_at && [t('settings.updates.lastChecked'), compactRun(updateInfo.checked_at, t)],
           updateInfo?.update_available && [t('settings.updates.latest'), `v${updateInfo.latest_version}`],
           updateInfo?.update_available && updateInfo?.published_at && [t('settings.updates.published'), ago(updateInfo.published_at)],
         ]} />
@@ -204,6 +205,7 @@ export function UpdateChecker() {
         )}
 
         {error && <Notice tone="bad">{error}</Notice>}
+        {!error && updateInfo?.error && <Notice tone="bad">{t('settings.checkFailed')}</Notice>}
 
         {updateInfo?.message && !updateInfo?.update_available && <p className="group-hint">{serverMessage(updateInfo.message)}</p>}
 

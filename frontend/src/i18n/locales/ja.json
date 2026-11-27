@@ -4546,6 +4546,7 @@
       "checkTitle": "アップデートの確認",
       "checking": "アップデートを確認しています…",
       "installed": "インストール済みのバージョン",
+      "lastChecked": "最終確認",
       "latest": "最新バージョン",
       "published": "公開日",
       "noReleases": "リリースが見つかりません。",
