@@ -3,16 +3,20 @@ import json
 import hashlib
 import base64
 import logging
+import time
 from typing import Optional
 
 import requests
 
 from models import db
 from models.acme_models import AcmeChallenge, AcmeAuthorization
-from services.acme.http01 import IncorrectResponse, fetch_following_redirects
+from services.acme.http01 import TOTAL_TIMEOUT_FACTOR, IncorrectResponse, fetch_following_redirects
 from utils.datetime_utils import utc_now
 
 logger = logging.getLogger(__name__)
+
+# Per connect attempt and handshake; TOTAL_TIMEOUT_FACTOR times this bounds the whole validation
+TLS_ALPN_TIMEOUT = 10
 
 
 class ChallengeMixin:
@@ -473,18 +477,32 @@ class ChallengeMixin:
             # validation. The SNI name is already decoupled below, and
             # check_hostname is off.
             candidates = pinned_ips if pinned_ips else [identifier_value]
+            late = TimeoutError('tls-alpn-01 handshake not completed in time')
+            deadline = time.monotonic() + TOTAL_TIMEOUT_FACTOR * TLS_ALPN_TIMEOUT
             sock = None
-            last_err = None
+            last_err = late
             for cand in candidates:
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    raise late
                 try:
-                    sock = socket.create_connection((cand, 443), timeout=10)
+                    sock = socket.create_connection((cand, 443), timeout=min(TLS_ALPN_TIMEOUT, remaining))
                     break
                 except OSError as conn_err:
                     last_err = conn_err
             if sock is None:
-                raise last_err
+                raise late if time.monotonic() >= deadline else last_err
             with sock:
-                with ctx.wrap_socket(sock, server_hostname=sni_hostname) as ssock:
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    raise late
+                # CPython bounds a whole do_handshake by the socket timeout, however the bytes trickle in
+                sock.settimeout(min(TLS_ALPN_TIMEOUT, remaining))
+                try:
+                    ssock = ctx.wrap_socket(sock, server_hostname=sni_hostname)
+                except TimeoutError as handshake_err:
+                    raise late from handshake_err
+                with ssock:
                     # Verify ALPN was negotiated
                     negotiated = ssock.selected_alpn_protocol()
                     if negotiated != 'acme-tls/1':
