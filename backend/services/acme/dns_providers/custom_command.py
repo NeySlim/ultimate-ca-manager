@@ -22,8 +22,9 @@ record reference in $RECORD_NAME etc. via env, that avoids all command
 injection through domain names.
 
 SECURITY posture: provider credentials are admin-controlled, but a command
-provider executes local code as the UCM service account. Gate behind
-``write:acme`` role and only accept absolute paths to existing executables.
+provider executes local code as the UCM service account. Writing one needs
+``write:deploy`` (api/v2/dns_providers.py), running an existing one ``write:acme``;
+only absolute paths to existing executables are accepted.
 """
 import os
 import shlex

@@ -3063,6 +3063,8 @@ Content-Type: application/json
 }
 ```
 
+A `custom_command` provider runs a local program: creating or updating one also requires `write:deploy` (administrators only), otherwise `403`.
+
 ### Get DNS Provider
 ```http
 GET /api/v2/dns-providers/{provider_id}

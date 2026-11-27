@@ -3,8 +3,8 @@ DNS Providers API Routes
 CRUD operations for DNS provider configurations
 """
 import json
-from flask import Blueprint, request
-from auth.unified import require_auth
+from flask import Blueprint, g, request
+from auth.unified import has_permission, require_auth
 from fips_mode import FipsRestricted
 from utils.response import success_response, error_response
 from utils.db_transaction import safe_commit
@@ -24,6 +24,20 @@ logger = logging.getLogger(__name__)
 bp = Blueprint('dns_providers', __name__)
 
 _SECRET_HINTS = ('secret', 'token', 'password', 'key')
+
+# This type runs a local program as the service account: writing one takes
+# the administrator permission that guards remote command execution.
+_COMMAND_TYPES = frozenset({'custom_command'})
+_COMMAND_PERMISSION = 'write:deploy'
+
+
+def _command_type_refused(provider_type):
+    if provider_type in _COMMAND_TYPES and not has_permission(
+            _COMMAND_PERMISSION, getattr(g, 'permissions', None) or []):
+        return error_response(
+            f'Writing a {provider_type} DNS provider requires the {_COMMAND_PERMISSION} permission',
+            403)
+    return None
 
 
 def _provider_dict(provider):
@@ -81,6 +95,9 @@ def create_dns_provider():
         return error_response('Provider type is required', 400)
     if not is_valid_provider_type(provider_type):
         return error_response(f'Invalid provider type: {provider_type}', 400)
+    refused = _command_type_refused(provider_type)
+    if refused:
+        return refused
     if _name_taken(name):
         return error_response(f'A DNS provider named {name!r} already exists', 409)
     
@@ -189,6 +206,9 @@ def update_provider(provider_id):
     provider = db.session.get(DnsProvider, provider_id)
     if not provider:
         return error_response('Provider not found', 404)
+    refused = _command_type_refused(provider.provider_type)
+    if refused:
+        return refused
     
     data = request.json
     if not data:

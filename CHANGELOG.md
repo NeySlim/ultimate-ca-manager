@@ -7,6 +7,12 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ---
 
+## [Unreleased]
+
+### Security
+
+- ACME DNS: a `custom_command` provider runs a local program as the service account, yet any holder of `write:acme` (the operator role, custom roles, API keys) could create one or rewrite its command. Creating or changing such a provider now requires `write:deploy`, which only administrators hold; using an existing one is unchanged.
+
 ## [2.254.7] - 2026-11-23
 
 ### Security
