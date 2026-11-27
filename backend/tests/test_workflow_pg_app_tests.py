@@ -102,8 +102,8 @@ def test_the_durations_file_weighs_each_file_once():
 
 
 FAULTS = 'test-backend-faults'
-# A part of test-backend: about twelve minutes on four workers
-PART_TARGET = 12 * 60
+# A part of test-backend: at most fifteen minutes on four workers
+PART_TARGET = 15 * 60
 
 
 def _every_test_file():
@@ -168,7 +168,22 @@ def test_no_backend_file_outlasts_a_part():
     files = [f for part in parts for f in part]
     longest = max(weights.get(f, median) for f in files)
     share = sum(weights.get(f, median) for f in files) / (len(parts) * 4)
-    assert longest <= PART_TARGET and longest <= share, (longest, share)
+    assert longest <= PART_TARGET and longest <= share and share <= PART_TARGET, (longest, share)
+
+
+@pytest.mark.parametrize('content, cited', [
+    (None, 'no exclusion list'),
+    ('# nothing but a comment\n', 'lists nothing'),
+    ('tests/test_no_such_file_*.py\n', 'tests/test_no_such_file_*.py'),
+])
+def test_an_exclusion_list_that_excludes_nothing_stops_the_shard(tmp_path, content, cited):
+    """A missing, empty or stale exclusion list would hand the fault scenarios back to the shards."""
+    listed = tmp_path / 'exclude.txt'
+    if content is not None:
+        listed.write_text(content)
+    result = subprocess.run([str(SHARD), '1', '2'], cwd=ROOT / 'backend', capture_output=True, text=True,
+                            env={**os.environ, 'SHARD_EXCLUDE': str(listed)})
+    assert result.returncode != 0 and result.stdout == '' and cited in result.stderr, result
 
 
 def test_a_shard_lists_its_longest_files_first(tmp_path):

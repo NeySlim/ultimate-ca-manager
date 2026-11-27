@@ -23,6 +23,7 @@ fi
 if [ -n "${SHARD_EXCLUDE:-}" ]; then
   [ -f "$SHARD_EXCLUDE" ] || { echo "shard: no exclusion list $SHARD_EXCLUDE" >&2; exit 2; }
   excluded=$(expand "$SHARD_EXCLUDE")
+  [ -n "$excluded" ] || { echo "shard: exclusion list $SHARD_EXCLUDE lists nothing" >&2; exit 2; }
   files=$(printf '%s\n' "$files" | grep -v -x -F -e "$excluded" || true)
 fi
 # A missing or malformed weights file would deal by name without a word: refuse it

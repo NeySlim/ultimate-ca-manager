@@ -2,7 +2,7 @@
 """Write scripts/ci/test-durations.txt, the weights shard-tests.sh deals the test files by.
 
 Usage: test_durations.py [-o OUT] LOG...
-  LOG: either the logs of the CI's backend shard jobs (pytest -v -n 4 --dist loadfile, each
+  LOG: either the logs of the CI's backend jobs, the shards and the fault scenarios (pytest -v -n 4, each
        line stamped by GitHub: a worker's time between two results goes to the later test's
        file), or the output of a run with `--durations=0 --durations-min=0` (setup, call and
        teardown summed per file);
