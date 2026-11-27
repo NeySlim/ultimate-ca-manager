@@ -53,6 +53,8 @@ class RestorePlan:
         self.same_installation = False
         # The sections a replacing restore prunes; empty in a merge
         self.pruned = frozenset()
+        # A merge keeps the revoked state of a row here (kept_states)
+        self.merging = False
         # Rows an older archive cannot place, and secrets it carries under a
         # key this installation does not hold: both told in the result.
         self.left_out: List[str] = []

@@ -36,6 +36,7 @@ from utils.nul_text import NUL, escape_nul
 from ..export_generic import CHAIN_VARIANT_FINGERPRINT, REFERENCE_SUFFIX, load_model
 from ..manifest import SECTIONS
 from . import audit_ids
+from .kept_states import held_here, put_back
 from .plan import RestorePlan, RestoreValidationError, row_label
 from .transaction import tick
 from .windows_profiles import IDENTITY as _PROFILE_IDENTITY, PROFILES as _PROFILES, restored_identity
@@ -99,8 +100,10 @@ def apply_columns(instance, section_name: str, row: Dict[str, Any],
 def _apply_or_leave_out(section_name, section, instance, row, columns, attribute_of, plan) -> bool:
     state = sa_inspect(instance)
     new = state.transient or state.pending
+    held = None if new else held_here(section_name, instance, plan.merging)
     try:
         _apply_row(section_name, section, instance, row, columns, attribute_of, plan, new)
+        put_back(instance, held)
     except UnplaceableLegacyRow as left_out:
         if new and state.persistent:
             db.session.delete(instance)

@@ -28,6 +28,7 @@ from .export_generic import REFERENCE_SUFFIX
 from .restore import RestorePlan, single_transaction
 from .restore.transaction import checkpoint, expect_rows, tick, ticking
 from .restore import audit_ids
+from .restore.kept_states import held_here, put_back
 from .manifest import SECTIONS
 from .section_store import SectionStore, section_kind, section_length
 from .restore.apply import (apply_columns, apply_section, escape_nul_in_archive,
@@ -484,6 +485,7 @@ class RestoreCoreMixin:
         results['mode'] = mode
         # A merge never lowers a revocation made here, of a certificate or a CA (_kept_revocation)
         self._merging = mode == 'merge'
+        plan.merging = self._merging
         self._kept_revocations = []
         # SSH certificates revoked with their serial's revoked holder: audited after the commit
         self._ssh_aligned = {}
@@ -1349,6 +1351,7 @@ class RestoreCoreMixin:
                 continue
             existing = AcmeAccount.query.filter_by(account_id=account_id).first()
             target = existing
+            held = held_here('acme_accounts', existing, getattr(self, '_merging', False))
             if existing:
                 existing.jwk = acme_data['jwk']
                 existing.jwk_thumbprint = jwk_thumbprint
@@ -1356,6 +1359,7 @@ class RestoreCoreMixin:
                 existing.status = acme_data.get('status', 'valid')
                 existing.terms_of_service_agreed = acme_data.get('terms_of_service_agreed', False)
                 existing.external_account_binding = acme_data.get('external_account_binding')
+                put_back(existing, held)
             else:
                 new_acme = AcmeAccount(
                     account_id=account_id,
@@ -1394,6 +1398,7 @@ class RestoreCoreMixin:
             revoked_at = _archived_datetime(where, 'revoked_at', eab.get('revoked_at'))
             existing = AcmeEabCredential.query.filter_by(kid=kid).first()
             target = existing
+            held = held_here('acme_eab_credentials', existing, getattr(self, '_merging', False))
             if existing:
                 existing.hmac_key_b64 = eab['hmac_key_b64']
                 existing.label = eab.get('label')
@@ -1404,6 +1409,7 @@ class RestoreCoreMixin:
                 existing.revoked_at = revoked_at
                 existing.revoked_by_user_id = eab.get('revoked_by_user_id')
                 existing.expires_at = expires_at
+                put_back(existing, held)
             else:
                 new_eab = AcmeEabCredential(
                     kid=kid,
