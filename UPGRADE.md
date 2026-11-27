@@ -160,6 +160,10 @@ Database migrations run automatically at startup.
 
 ## Version-Specific Notes
 
+### Package updates are checked again by root
+
+The `ucm-watcher` unit that installs an update from Settings > Updates now accepts only a release package of `/opt/ucm/data/updates/` matching the `.sha256` of its release, fetched by root directly from GitHub over HTTPS (no proxy), declaring the package `ucm` at the target version, above the installed one; it no longer forces an RPM install (`rpm -U --force`). A refused update installs nothing, leaves UCM running and is reported as failed at step `precheck` at the next hourly update check. A host whose root cannot reach github.com sees every update refused: install the package by hand there. The watcher's output, the package manager's included, is now in `journalctl -u ucm-watcher` only, no longer in `/var/log/ucm/ucm.log`.
+
 ### Export requests with a password in the wrong place are refused
 
 The routes that can return a private key (certificate, CA, CSR, user-certificate and mTLS exports, key recovery) now answer `400` instead of a key in clear for a request whose password they would not read: a form or plain-text body, a `GET` or `HEAD` carrying a body, a JSON body that is not an object, a `password` that is neither a string nor `null`, a name given twice in the JSON body, or a name containing `password` or `passphrase` placed anywhere but the top-level `password` string of the JSON body (including the query string, whatever the method, and a `password` nested inside another value). A script that sent `curl -d '{"password":"..."}'` without `Content-Type: application/json`, or `password=...` as a form, must send a `POST` with a JSON object body and that content type. Requests that were well formed, and unrelated extra parameters, are answered as before.

@@ -1,5 +1,6 @@
 """packaging/scripts/ucm-watcher.sh installing a DEB with UCM_FIPS_BUILD=1, run for real under a
 temporary root with the real native-setup.sh and stubs for dpkg, apt-get and systemctl."""
+import hashlib
 import json
 import pathlib
 import shutil
@@ -8,6 +9,7 @@ import subprocess
 import pytest
 
 from tests.test_native_setup_script import BASH, UBUNTU, _env, _stub, _toolbox
+from tests.test_update_watcher_claim import DPKG_COMPARE, stub_version_tools
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 WATCHER = ROOT / 'packaging' / 'scripts' / 'ucm-watcher.sh'
@@ -30,21 +32,30 @@ def _update(tmp_path, dpkg, apt_get, stale_marker=False):
     (root / 'opt/ucm/VERSION').write_text('98.0\n')
     package = data / 'updates' / 'ucm_99.0_all.deb'
     package.write_text('')
+    # The release digest the watcher fetches as root (tests/test_update_watcher_claim.py)
+    releases = tmp_path / 'releases'
+    (releases / 'v99.0').mkdir(parents=True)
+    (releases / 'v99.0' / 'ucm_99.0_all.deb.sha256').write_text(
+        hashlib.sha256(b'').hexdigest() + '  ucm_99.0_all.deb\n')
     (data / '.update_pending').write_text(str(package))
     (data / '.update_manifest.json').write_text(json.dumps({'op_id': 'op', 'to_version': '99.0'}))
 
     bin_dir, _ = _toolbox(tmp_path, rustc_in_path='1.92.0')
-    for util in ('date', 'tee', 'python3', 'bash'):
+    for util in ('date', 'tee', 'python3', 'bash', 'rm', 'dirname', 'tr', 'sed'):
         if not (bin_dir / util).exists():
             (bin_dir / util).symlink_to(shutil.which(util))
     (root / 'opt/ucm/venv/bin').mkdir(parents=True)
     (root / 'opt/ucm/venv/bin/python').symlink_to(_stub(tmp_path / 'python3.12'))
     calls = tmp_path / 'calls'
-    _stub(bin_dir / 'dpkg', f'echo dpkg >> {calls}\nR={root}\n{dpkg}')
+    (tmp_path / 'in_database').write_text('98.0')
+    stub_version_tools(bin_dir, tmp_path)
+    _stub(bin_dir / 'dpkg', f'{DPKG_COMPARE}\necho dpkg >> {calls}\nR={root}\n{dpkg}')
     _stub(bin_dir / 'apt-get', f'echo apt-get >> {calls}\nR={root}\n{apt_get}')
     _stub(bin_dir / 'systemctl')
+    _stub(bin_dir / 'dpkg-deb', 'case "$3" in Package) echo ucm;; *) echo 99.0;; esac')
 
     env = _env(tmp_path, UBUNTU, {'PATH': str(bin_dir), 'UCM_WATCHER_ROOT': str(root),
+                                  'UCM_WATCHER_RELEASES': releases.as_uri(), 'TMPDIR': str(tmp_path),
                                   'UCM_SETUP_BUILD_LOG': str(root / 'var/log/ucm/fips-build.log')})
     if stale_marker:
         (root / 'var/log/ucm/fips-build.failed').write_text('build failed')
