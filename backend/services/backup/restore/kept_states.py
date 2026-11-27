@@ -12,7 +12,7 @@ _OUTRANKED = {
                              ('used_at', 'used_by_account_id')),
 }
 
-# section: (is the row revoked here, columns that hold the revocation, values the revocation set)
+# section: (is the row in a final state here, columns that hold it, values that state implies)
 KEPT_STATES = {
     # The KRL is rebuilt from these rows: a lifted one would leave it and sshd accept it again
     'ssh_certificates': (lambda row: bool(row.revoked),
@@ -32,6 +32,10 @@ KEPT_STATES = {
                              ('status', 'used_at', 'used_by_account_id', 'revoked_at',
                               'revoked_by_user_id'), {}),
     'acme_dns_update_keys': (lambda row: row.status == 'revoked', ('status', 'revoked_at'), {}),
+    # A recovered key is handed out once: an 'approved' archive row would hand it out again
+    'key_recovery_requests': (lambda row: row.status in ('recovered', 'rejected', 'cancelled'),
+                              ('status', 'decided_by', 'decided_at', 'decision_note',
+                               'recovered_by', 'recovered_at'), {}),
 }
 
 

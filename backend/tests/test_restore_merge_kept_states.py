@@ -3,7 +3,8 @@
 Each case takes an archive while the row is live, revokes the row here, merges the archive back
 and expects the revocation to stand; an archive that revokes a row live here still revokes it.
 Tables: SSH certificates (and so their KRL), SSH hosts, cross-certificates, API keys,
-authentication certificates, ACME accounts, EAB credentials, DNS UPDATE keys. SQLite and PostgreSQL.
+authentication certificates, ACME accounts, EAB credentials (revoked or used), DNS UPDATE keys,
+key recovery requests (recovered, rejected, cancelled). SQLite and PostgreSQL.
 """
 import base64
 import copy
@@ -175,6 +176,19 @@ def _make_dns_update_key():
     return row.id
 
 
+def _make_key_recovery_request():
+    from models.key_recovery import KeyRecoveryRequest
+    from tests.test_restore_replace_dependents import _authority_row, _certificate_row
+    tag = _tag()
+    certificate = _certificate_row(f'kept-krr-{tag}', _authority_row(f'kept-krr-ca-{tag}'))
+    row = KeyRecoveryRequest(cert_id=certificate.id, cert_refid=certificate.refid, reason='kept',
+                             status='approved', requested_by='t', requested_at=_WHEN,
+                             decided_by='u', decided_at=_WHEN)
+    db.session.add(row)
+    db.session.commit()
+    return row.id
+
+
 def _set(**values):
     def revoke(row):
         for name, value in values.items():
@@ -226,6 +240,16 @@ CASES = {
         ('row', _use_eab), ('status', 'used_at', 'used_by_account_id'),
         lambda row: row.status == 'used',
         {'status': 'used', 'used_at': '2026-06-01T12:00:00', 'used_by_account_id': 'acct-archive'}),
+    # A recovered key is handed out once; a cancelled request is never reopened
+    'key_recovery_requests': (
+        'models.key_recovery:KeyRecoveryRequest', ('key_recovery_requests',), _make_key_recovery_request,
+        ('row', _set(status='recovered', recovered_by='t', recovered_at=_WHEN)),
+        ('status', 'recovered_by', 'recovered_at'), lambda row: row.status == 'recovered',
+        {'status': 'recovered', 'recovered_by': 'v', 'recovered_at': '2026-06-01T12:00:00'}),
+    'key_recovery_requests:cancelled': (
+        'models.key_recovery:KeyRecoveryRequest', ('key_recovery_requests',), _make_key_recovery_request,
+        ('row', _set(status='cancelled', decision_note='no')), ('status', 'decision_note'),
+        lambda row: row.status == 'cancelled', {'status': 'cancelled', 'decision_note': 'no'}),
     'acme_dns_update_keys': (
         'models.acme_dns_update:AcmeDnsUpdateKey', ('acme_dns_update_keys',), _make_dns_update_key,
         ('row', _set(status='revoked', revoked_at=_WHEN)), ('status', 'revoked_at'),
@@ -315,6 +339,7 @@ def _is(entry, row, section):
         'ca_cross_certificates': ('fingerprint_sha256',), 'api_keys': ('key_hash',),
         'auth_certificates': ('cert_fingerprint',), 'acme_accounts': ('account_id',),
         'acme_eab_credentials': ('kid',), 'acme_dns_update_keys': ('name',),
+        'key_recovery_requests': ('cert_refid',),
     }[section]
     return all(entry.get(column) == getattr(row, column) for column in identity)
 
