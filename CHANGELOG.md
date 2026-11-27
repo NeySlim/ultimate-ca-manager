@@ -12,7 +12,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 ### Security
 
 - Package updates: the root watcher installed whatever package path the service account wrote, through links too, and ran `rpm -U --force`. It now installs only a release package of the updates directory, copied out of that account's reach, matching the release's `.sha256` fetched by root, named `ucm` and above the installed version; a refused update installs nothing and leaves UCM running.
-- Package updates: the root watcher appended its output to `/var/log/ucm/ucm.log` and read and wrote the service account's files following links; it now logs to the journal only and opens those files without following links.
+- Package updates: the root watcher appended its output to `/var/log/ucm/ucm.log` and read and wrote the service account's files following links; it now logs to the journal only (`journalctl -u ucm-watcher`, also in the system logs page and the diagnostic bundle) and opens those files without following links.
 
 ## [2.254.7] - 2026-11-23
 

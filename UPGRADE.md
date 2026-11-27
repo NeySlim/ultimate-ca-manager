@@ -162,7 +162,7 @@ Database migrations run automatically at startup.
 
 ### Package updates are checked again by root
 
-The `ucm-watcher` unit that installs an update from Settings > Updates now accepts only a release package of `/opt/ucm/data/updates/` matching the `.sha256` of its release, fetched by root directly from GitHub over HTTPS (no proxy), declaring the package `ucm` at the target version, above the installed one; it no longer forces an RPM install (`rpm -U --force`). A refused update installs nothing, leaves UCM running and is reported as failed at step `precheck` at the next hourly update check. A host whose root cannot reach github.com sees every update refused: install the package by hand there. The watcher's output, the package manager's included, is now in `journalctl -u ucm-watcher` only, no longer in `/var/log/ucm/ucm.log`.
+The `ucm-watcher` unit that installs an update from Settings > Updates now accepts only a release package of `/opt/ucm/data/updates/` matching the `.sha256` of its release, fetched by root directly from GitHub over HTTPS (no proxy), declaring the package `ucm` at the target version, above the installed one; it no longer forces an RPM install (`rpm -U --force`). A refused update installs nothing, leaves UCM running and is reported as failed at step `precheck` at the next hourly update check. A host whose root cannot reach github.com sees every update refused: install the package by hand there. The watcher's output, the package manager's included, is now in `journalctl -u ucm-watcher` only, no longer in `/var/log/ucm/ucm.log`; it also appears in the Journal source of the system logs page and in the diagnostic bundle.
 
 ### Export requests with a password in the wrong place are refused
 

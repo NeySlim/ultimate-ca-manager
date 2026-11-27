@@ -8,7 +8,7 @@ attaches it to a support request or GitHub issue.
 Contents:
   - ucm.log      (last ~2 MB of application log)
   - error.log    (last ~2 MB of gunicorn/error log)
-  - journal.log  (last 2000 lines of `journalctl -u ucm`, systemd hosts only)
+  - journal.log  (last 2000 lines of `journalctl -u ucm -u ucm-watcher`, systemd hosts only)
   - access.log   (last 1 MB of access log, when present)
   - system.txt    (version, migration count, DB backend, services status)
 
@@ -156,7 +156,9 @@ def _tail_bytes(path: Path, max_bytes: int) -> Optional[bytes]:
 
 
 def collect_journal() -> Optional[bytes]:
-    """Return the last ``MAX_JOURNAL_LINES`` lines of the ucm unit journal.
+    """Return the last ``MAX_JOURNAL_LINES`` lines of the ucm and ucm-watcher unit journals.
+
+    The update watcher logs to the journal only, package manager output included.
 
     Skipped on Docker (no systemd journal) and when journalctl is missing.
     Returns raw bytes (may be empty); None when journalctl is unavailable.
@@ -168,7 +170,7 @@ def collect_journal() -> Optional[bytes]:
         return None
     try:
         proc = subprocess.run(
-            [exe, '-u', 'ucm', '--no-pager', '-n', str(MAX_JOURNAL_LINES),
+            [exe, '-u', 'ucm', '-u', 'ucm-watcher', '--no-pager', '-n', str(MAX_JOURNAL_LINES),
              '--output=short-iso'],
             capture_output=True, text=True, timeout=15,
         )
