@@ -446,3 +446,69 @@ def test_a_merge_keeps_an_account_key_changed_here(installation):
 
     _row, after = _state(AcmeAccount, row_id, ('jwk', 'jwk_thumbprint'))
     assert after == before, (before, after)
+
+
+def _eab_row(kid, hmac, **values):
+    from models.acme_models import AcmeEabCredential
+    row = AcmeEabCredential(kid=kid, **values)
+    row.hmac_key_b64 = hmac
+    db.session.add(row)
+    return row
+
+
+@pytest.mark.parametrize('legacy', [False, True], ids=['with-identities', 'older-archive'])
+def test_an_eab_credential_names_its_users_as_the_archive_names_them(installation, app,
+                                                                     tmp_path, legacy):
+    """Another installation numbers its accounts its own way: the EAB links follow the identity.
+
+    An archive older than the identities names users by the source's number alone: a new row
+    gets no link rather than another account's, an existing row keeps its own.
+    """
+    from models import User
+    from models.acme_models import AcmeEabCredential
+    tag = _tag()
+    hmac = base64.urlsafe_b64encode(os.urandom(32)).decode()
+    source_ids = {'creator': 910_000 + int(tag[:4], 16), 'revoker': 930_000 + int(tag[4:8], 16)}
+    with _installation(app, f"sqlite:///{tmp_path / 'source.db'}", Keys(tmp_path, f'eab-src-{tag}')), \
+            app.app_context():
+        for role, user_id in source_ids.items():
+            db.session.add(User(id=user_id, username=f'eab-{role}-{tag}', role='admin',
+                                email=f'eab-{role}-{tag}@example.test', password_hash='x'))
+        db.session.flush()
+        for kid in (f'eab-new-{tag}', f'eab-used-{tag}'):
+            _eab_row(kid, hmac, status='revoked', revoked_at=_WHEN,
+                     created_by_user_id=source_ids['creator'], revoked_by_user_id=source_ids['revoker'])
+        db.session.commit()
+        master, payload = _archive(('users', 'acme_eab_credentials'))
+        payload = {name: copy.deepcopy(list(payload[name])) for name in ('users', 'acme_eab_credentials')}
+
+    if legacy:
+        for entry in payload['acme_eab_credentials']:
+            entry.pop('created_by_user_id_ref'), entry.pop('revoked_by_user_id_ref')
+    # Here, the source's numbers belong to other accounts
+    decoys = {role: User(id=user_id, username=f'eab-decoy-{role}-{tag}', role='admin',
+                         email=f'eab-decoy-{role}-{tag}@example.test', password_hash='x')
+              for role, user_id in source_ids.items()}
+    db.session.add_all(decoys.values())
+    local = _user()
+    used = _eab_row(f'eab-used-{tag}', hmac, status='used', used_at=_WHEN, used_by_account_id='acct-here',
+                    created_by_user_id=local.id)
+    db.session.commit()
+    used_id, local_id = used.id, local.id
+
+    _merge(master, payload)
+
+    db.session.expire_all()
+    named = {role: User.query.filter_by(username=f'eab-{role}-{tag}').one().id for role in source_ids}
+    assert not set(named.values()) & set(source_ids.values())
+    new = AcmeEabCredential.query.filter_by(kid=f'eab-new-{tag}').one()
+    used = db.session.get(AcmeEabCredential, used_id)
+    if legacy:
+        assert (new.created_by_user_id, new.revoked_by_user_id) == (None, None)
+        assert used.created_by_user_id == local_id
+    else:
+        assert (new.created_by_user_id, new.revoked_by_user_id) == (named['creator'], named['revoker'])
+        assert used.created_by_user_id == named['creator']
+    # revoked outranks used: the archive's revocation, by its revoker, the use made here kept
+    assert (used.status, used.used_by_account_id) == ('revoked', 'acct-here')
+    assert used.revoked_by_user_id == (None if legacy else named['revoker'])
