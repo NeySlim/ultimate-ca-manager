@@ -1,6 +1,7 @@
 #!/bin/sh
 # Prints shard K of N of the backend test files, one per line; run from backend/.
 # Usage: shard-tests.sh K N [LIST]   LIST: a file of globs, one per line (default: every test file).
+# SHARD_EXCLUDE names another such file: its files are left out of the set before dealing.
 # Files are dealt by measured duration (test-durations.txt beside this script, "seconds path";
 # SHARD_DURATIONS names another): the longest first, each to the lightest shard, and printed
 # longest first so pytest-xdist starts them first. A file without a measure weighs the median.
@@ -9,13 +10,21 @@ set -eu
 k=$1 n=$2 list=${3:-}
 durations=${SHARD_DURATIONS:-$(dirname "$0")/test-durations.txt}
 if [ "$k" -lt 1 ] || [ "$k" -gt "$n" ]; then echo "shard $k of $n: out of range" >&2; exit 2; fi
+expand() { # the files the globs of list $1 match; a pattern that matches nothing fails, never skips
+  grep -v -e '^[[:space:]]*#' -e '^[[:space:]]*$' "$1" | while read -r glob; do
+    ls $glob 2>/dev/null || { echo "$1: no file matches $glob" >&2; exit 1; }
+  done
+}
 if [ -n "$list" ]; then
-  files=$(grep -v -e '^[[:space:]]*#' -e '^[[:space:]]*$' "$list" | while read -r glob; do
-    # A pattern that matches nothing is a renamed or deleted file: fail, never skip.
-    ls $glob 2>/dev/null || { echo "$list: no file matches $glob" >&2; exit 1; }
-  done)
+  files=$(expand "$list")
 else
   files=$(find tests -name 'test_*.py')
+fi
+if [ -n "${SHARD_EXCLUDE:-}" ]; then
+  [ -f "$SHARD_EXCLUDE" ] || { echo "shard: no exclusion list $SHARD_EXCLUDE" >&2; exit 2; }
+  excluded=$(expand "$SHARD_EXCLUDE")
+  [ -n "$excluded" ] || { echo "shard: exclusion list $SHARD_EXCLUDE lists nothing" >&2; exit 2; }
+  files=$(printf '%s\n' "$files" | grep -v -x -F -e "$excluded" || true)
 fi
 # A missing or malformed weights file would deal by name without a word: refuse it
 [ -f "$durations" ] || { echo "shard: no durations file $durations" >&2; exit 2; }

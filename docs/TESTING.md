@@ -99,7 +99,9 @@ Each test file covers 3 levels per endpoint:
 - No external dependencies (no Docker, no network)
 - PostgreSQL mode: `UCM_TEST_APP_PG_URL` runs the same fixtures on PostgreSQL, see [testing/postgres-harness.md](testing/postgres-harness.md)
 - A test that restores through a restore route calls `tests/restore_support.post_to_the_end`: it asks for the job with `Prefer: respond-async` and reads its final answer, so a loaded host past the route's bounded wait never turns it into a 202
-- The CI deals the test files to its parts by measured duration (`scripts/ci/test-durations.txt`, longest first, each to the lightest part); when the parts drift apart, regenerate the file from the logs of the shard jobs with `scripts/ci/test_durations.py`
+- The CI deals the test files to its parts by measured duration (`scripts/ci/test-durations.txt`, longest first, each to the lightest part); when the parts drift apart, regenerate the file from the logs of both families of jobs, "Backend Tests (k/N)" and "Backend Tests (fault scenarios k/N)", with `scripts/ci/test_durations.py`
+- The jobs "Backend Tests (k/N)" run every file but the fault scenarios, a file per worker (`--dist loadfile`); the jobs "Backend Tests (fault scenarios k/N)" run the files that `scripts/ci/fault-scenario-tests.txt` lists (`tests/test_package_leftover_retry_*.py`), test by test (`--dist load`), since one of these files lasts up to 24 minutes on one worker
+- A push of `dev` runs every job but the one-process suite and the HA bench; on other branches the E2E job and the FIPS image build (`dev` and `main` only) are skipped too; a manual run of `tests.yml` runs the one-process suite (and the HA bench with `ha`), and the jobs of a push too with `full`, the FIPS image build excepted
 
 #### Optional backends: SoftHSM, GSSAPI, Redis
 
@@ -231,7 +233,7 @@ Without `UCM_E2E_MANAGED=1`, which only `scripts/ci/e2e.sh` sets, and always wit
 
 ## CI/CD Integration
 
-The "End-to-end (browser)" job of `tests.yml` runs on pull requests, on each push of the 3.0 integration branch and of `test`, and on a manual run. It installs the backend and frontend dependencies and the browser libraries, then calls `scripts/ci/e2e.sh`; on failure the Playwright report and the traces are kept as the `e2e-report` artifact. `backend/tests/test_workflow_e2e.py` pins when the job runs and what it runs.
+The "End-to-end (browser)" job of `tests.yml` runs on pull requests, on each push of the 3.0 integration branch, and on a manual run with `full`. It installs the backend and frontend dependencies and the browser libraries, then calls `scripts/ci/e2e.sh`; on failure the Playwright report and the traces are kept as the `e2e-report` artifact. `backend/tests/test_workflow_e2e.py` pins when the job runs and what it runs.
 
 ## Troubleshooting
 

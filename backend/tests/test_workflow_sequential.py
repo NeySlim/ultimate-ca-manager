@@ -19,7 +19,6 @@ def _ctx(event, ref):
 @pytest.mark.parametrize('event, ref, runs', [
     ('workflow_dispatch', f'refs/heads/{LINE_BRANCH}', True),
     ('push', f'refs/heads/{LINE_BRANCH}', False),
-    ('push', 'refs/heads/test', False),
     ('push', 'refs/heads/main', False),
     ('schedule', 'refs/heads/main', True),
     ('workflow_dispatch', 'refs/heads/feature/x', True),
@@ -55,7 +54,6 @@ def _random_step():
     ('workflow_dispatch', f'refs/heads/{LINE_BRANCH}', True),
     ('push', f'refs/heads/{LINE_BRANCH}', False),
     ('schedule', 'refs/heads/main', True),
-    ('push', 'refs/heads/test', False),
     ('workflow_dispatch', 'refs/heads/feature/x', False),
     ('workflow_dispatch', f'refs/heads/{RETIRED_BRANCH}', False),
 ])
@@ -84,7 +82,7 @@ def _job_concurrency(ref, sha, event='push'):
     return render(conc['group'], ctx), bool(evaluate(cancel, ctx) if isinstance(cancel, str) else cancel)
 
 
-@pytest.mark.parametrize('ref', [f'refs/heads/{LINE_BRANCH}', 'refs/heads/test', 'refs/heads/main'])
+@pytest.mark.parametrize('ref', [f'refs/heads/{LINE_BRANCH}', 'refs/heads/main'])
 def test_a_newer_push_never_cancels_nor_queues_the_run(ref):
     """One group per commit: the fast jobs of a new push start at once, the old run is not cancelled."""
     (g1, cancel1), (g2, _) = _run_concurrency(ref, 'a1'), _run_concurrency(ref, 'b2')
@@ -176,8 +174,9 @@ def _collected(arguments):
     return [line for line in out.stdout.splitlines() if '::' in line]
 
 
-def test_the_shards_still_run_the_slow_tests():
+@pytest.mark.parametrize('job', ['test-backend', 'test-backend-faults'])
+def test_the_shards_still_run_the_slow_tests(job):
     """No -m on their command, and none from the configuration either: collected as they run."""
-    shard = _pytest_commands(load('tests.yml')['jobs']['test-backend'])
+    shard = _pytest_commands(load('tests.yml')['jobs'][job])
     assert shard and all(_marker(c) is None for c in shard), shard
     assert any(line.startswith(SLOW_FILE) for line in _collected([SLOW_FILE]))
