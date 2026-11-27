@@ -147,3 +147,56 @@ def test_a_limited_key_cannot_regenerate_a_key_wider_than_itself(app, auth_clien
     assert b'can only create or regenerate a key limited to its own networks' in r.data
     with app.app_context():
         assert db.session.get(APIKey, wider['id']).is_active
+
+
+# --- HA rolling upgrade: a node older than 3.1 ignores the list ------------------------------
+
+@pytest.fixture
+def cluster(app, monkeypatch):
+    """HA, this node 'kn-a'; yields add(name, version, beat_age_seconds, pid) for the other nodes."""
+    from datetime import timedelta
+    from config.settings import Config
+    from models.cluster import ClusterNode
+    from utils.datetime_utils import utc_now
+    monkeypatch.setattr(Config, 'HA_MODE', True)
+    monkeypatch.setattr(Config, 'NODE_ID', 'kn-a')
+    added = []
+
+    def add(name, version, age=0, pid=1):
+        with app.app_context():
+            now = utc_now()
+            db.session.add(ClusterNode(node_id=name, started_at=now - timedelta(minutes=10),
+                                       heartbeat_at=now - timedelta(seconds=age), is_leader=False,
+                                       pid=pid, version=version))
+            db.session.commit()
+        added.append(name)
+    yield add
+    with app.app_context():
+        ClusterNode.query.filter(ClusterNode.node_id.in_(added)).delete(synchronize_session=False)
+        # Under the per-user key limit for the next case
+        APIKey.query.filter(APIKey.name.like('kn-%')).delete(synchronize_session=False)
+        db.session.commit()
+
+
+def _limited_body(name):
+    return {'name': name, 'permissions': ['read:certificates'], 'allowed_networks': ['192.0.2.0/24']}
+
+
+def test_a_list_is_refused_while_a_node_older_than_3_1_runs(auth_client, cluster):
+    cluster('kn-a', '3.0')          # this node's own row: the version it ran before this start
+    cluster('kn-b', '3.0~rc9')
+    r = _create(auth_client, _limited_body('kn-rolling'))
+    assert r.status_code == 409
+    assert b'kn-b (3.0~rc9)' in r.data and b'kn-a' not in r.data
+    # Without a list nothing depends on the other node
+    assert _create(auth_client, {'name': 'kn-rolling-open', 'permissions': ['read:certificates']}).status_code == 201
+
+
+@pytest.mark.parametrize('version, age, pid', [
+    ('3.1', 0, 1), ('3.1-1', 0, 1), ('3.1-rc1', 0, 1), ('3.2', 0, 1),
+    ('3.0', 3600, 1),               # gone: its last beat is past the stale window
+    ('3.0', 0, None),               # stopped cleanly
+])
+def test_a_list_is_accepted_once_no_older_node_runs(auth_client, cluster, version, age, pid):
+    cluster('kn-c', version, age, pid)
+    assert _create(auth_client, _limited_body(f'kn-after-{version}-{age}-{pid}')).status_code == 201

@@ -141,6 +141,12 @@ def create_api_key():
         networks = limits
     elif not api_key_networks.within(networks, limits):
         return error_response(_WIDER_NETWORKS, 403)
+    behind = api_key_networks.nodes_not_enforcing() if networks else []
+    if behind:
+        return error_response(
+            'Source networks are enforced only once every node runs 3.1 or later; still on an older '
+            f'version: {", ".join(behind)}. Create this key once the upgrade is complete.', 409,
+            {'nodes': behind})
 
     # Check limit (max 10 keys per user by default). Expired keys don't
     # count - is_active alone doesn't capture that, expiry is derived live
