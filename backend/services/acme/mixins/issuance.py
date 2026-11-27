@@ -48,14 +48,15 @@ class IssuanceMixin:
                 for challenge in authorization.challenges
                 if challenge.status == 'valid' and challenge.type
             }
-            validation_methods[domain] = (
-                next(iter(valid_methods)) if len(valid_methods) == 1 else None
-            )
-            if len(valid_methods) != 1:
-                logger.warning(
-                    "Cannot determine a unique ACME validation method for %s",
-                    domain,
-                )
+            # One method as a string, several (concurrent validations) as a sorted
+            # tuple, none (auto-approved) as None: CAA checks each one used.
+            if len(valid_methods) == 1:
+                validation_methods[domain] = next(iter(valid_methods))
+            elif valid_methods:
+                validation_methods[domain] = tuple(sorted(valid_methods))
+            else:
+                validation_methods[domain] = None
+                logger.warning("No validated ACME challenge for %s", domain)
 
         return account_url, validation_methods
 

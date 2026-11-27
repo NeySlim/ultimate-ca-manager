@@ -5,9 +5,12 @@ Implements RFC 8659 CAA processing and the RFC 8657 ``accounturi`` and
 ``validationmethods`` issuer parameters used by ACME issuance.
 """
 import logging
-from typing import Dict, List, Mapping, Optional, Tuple
+from typing import Dict, List, Mapping, Optional, Sequence, Tuple, Union
 
 logger = logging.getLogger(__name__)
+
+# One ACME challenge type, several (all of them validated), or None for none.
+ValidationMethods = Optional[Union[str, Sequence[str]]]
 
 # Marks a failed CAA lookup (transient: retry later), never a CAA denial
 DNS_ERROR_MARKER = 'DNS error'
@@ -43,7 +46,7 @@ def _parse_issuer_value(value: str) -> Tuple[str, Dict[str, List[str]]]:
 def _parameters_allow(
     parameters: Mapping[str, List[str]],
     account_url: Optional[str],
-    validation_method: Optional[str],
+    validation_method: ValidationMethods,
 ) -> Tuple[bool, Optional[str]]:
     account_uris = parameters.get('accounturi', [])
     if account_uris and (
@@ -53,15 +56,18 @@ def _parameters_allow(
 
     method_parameters = parameters.get('validationmethods', [])
     if method_parameters:
-        # RFC 8657 §4: only a listed method authorizes. An authorization that
-        # names no method (auto-approved) used none, so it cannot match.
-        normalized_method = validation_method.lower() if validation_method else None
+        # RFC 8657 §4: only a listed method authorizes, so every method used must
+        # be listed; an authorization that names none (auto-approved) cannot match.
+        if isinstance(validation_method, str):
+            used_methods = {validation_method.lower()}
+        else:
+            used_methods = {method.lower() for method in validation_method or () if method}
         allowed_method_sets = [
             {method.strip().lower() for method in value.split(',') if method.strip()}
             for value in method_parameters
         ]
-        if normalized_method is None or any(
-            normalized_method not in allowed_methods
+        if not used_methods or any(
+            not used_methods <= allowed_methods
             for allowed_methods in allowed_method_sets
         ):
             return False, 'validationmethods does not allow the validation method used'
@@ -73,14 +79,15 @@ def check_caa(
     domain: str,
     issuer_domains: Optional[List[str]] = None,
     account_url: Optional[str] = None,
-    validation_method: Optional[str] = None,
+    validation_method: ValidationMethods = None,
     fail_hard: bool = False,
 ) -> Tuple[bool, str]:
     """Check whether CAA authorizes issuance for one DNS identifier.
 
     ``account_url`` is compared exactly when an RFC 8657 ``accounturi``
     parameter is present. ``validation_method`` is the ACME challenge type
-    actually used for this authorization (for example ``dns-01``).
+    actually used for this authorization (for example ``dns-01``), or the
+    types of every challenge validated on it.
     """
     import dns.exception
     import dns.resolver
@@ -191,7 +198,7 @@ def check_caa_for_domains(
     domains: List[str],
     issuer_domains: Optional[List[str]] = None,
     account_url: Optional[str] = None,
-    validation_methods: Optional[Mapping[str, Optional[str]]] = None,
+    validation_methods: Optional[Mapping[str, ValidationMethods]] = None,
     fail_hard: bool = False,
 ) -> Tuple[bool, str]:
     """Check CAA for multiple domains; every domain must be authorized."""

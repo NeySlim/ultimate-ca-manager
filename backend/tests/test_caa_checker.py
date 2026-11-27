@@ -171,6 +171,22 @@ class TestIssueMatching:
         assert ok is False
         assert 'validationmethods' in reason
 
+    def test_validationmethods_allows_several_methods_all_listed(self):
+        # Two challenges validated concurrently: each method used must be listed.
+        rec = _FakeCAA('issue', 'ucm.example.com; validationmethods=http-01,dns-01')
+        with _patch({'example.com': [rec]}):
+            ok, _ = check_caa('www.example.com', ['ucm.example.com'],
+                              validation_method=('dns-01', 'http-01'))
+        assert ok is True
+
+    def test_validationmethods_denies_several_methods_one_unlisted(self):
+        rec = _FakeCAA('issue', 'ucm.example.com; validationmethods=dns-01')
+        with _patch({'example.com': [rec]}):
+            ok, reason = check_caa('www.example.com', ['ucm.example.com'],
+                                   validation_method=('dns-01', 'http-01'))
+        assert ok is False
+        assert 'validationmethods' in reason
+
     def test_validationmethods_with_wrong_method_denies(self):
         rec = _FakeCAA('issue', 'ucm.example.com; validationmethods=dns-01')
         with _patch({'example.com': [rec]}):
@@ -332,7 +348,7 @@ class TestIssuanceContext:
         assert account_url == 'https://ca.example/acme/acct/account-1'
         assert methods == {'www.example.com': 'http-01'}
 
-    def test_ambiguous_valid_methods_fail_closed(self):
+    def test_every_valid_method_is_reported(self):
         from services.acme.mixins.issuance import IssuanceMixin
 
         authorization = SimpleNamespace(
@@ -352,7 +368,7 @@ class TestIssuanceContext:
 
         _, methods = mixin._caa_request_context(order)
 
-        assert methods == {'*.example.com': None}
+        assert methods == {'*.example.com': ('dns-01', 'http-01')}
 
 
 class TestMultipleDomains:
