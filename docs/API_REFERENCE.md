@@ -432,7 +432,7 @@ and its `last_used_at` is not updated. An invalid entry answers `400`. A key cre
 key gets its networks when none is given, and `403` when one lies outside them; regenerating keeps
 them, under the same rule when a limited API key regenerates another key. Every key in a listing carries `allowed_networks` (`[]` for any address).
 
-The first `DELETE` revokes a key that still works (kept for the audit history); a second one, or one on an expired key, deletes it. A call authenticated by an API key renames (`PATCH`), revokes or deletes itself, or another key of the account only when it holds every scope of that key, as `regenerate` requires (`403` otherwise); a session manages every key of its account.
+The first `DELETE` revokes a key that still works (kept for the audit history); a second one, or one on an expired key, deletes it. A call authenticated by an API key renames (`PATCH`), revokes or deletes itself, or another key of the account only when both the calling key and its owner still hold every scope of that key, as `regenerate` requires (`403` otherwise, a `*` key included when the owner has lost one of them); a session manages every key of its account.
 
 An administrator (`write:users`) lists another user's keys and revokes a leaked or unused one, with the same revoke-then-delete rule. The secret is never returned. Each change is audited with the administrator, the account and the key. An API key cannot revoke or delete through them a key of its own account.
 ```http

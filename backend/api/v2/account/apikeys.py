@@ -37,8 +37,9 @@ def _session_proof():
 
 
 def _caller_covers(api_key):
-    """A key renames, revokes or deletes itself, or a sibling whose every scope it could grant:
-    a narrow key that leaks cannot take down the owner's wider keys. A session covers them all."""
+    """A key renames, revokes or deletes itself, or a sibling whose every scope it and its owner
+    still hold: a narrow key that leaks cannot take down the owner's wider keys, and a sibling
+    holding a scope the owner lost is left to a session, which covers them all."""
     if getattr(g, 'auth_method', None) != 'api_key' or api_key.id == getattr(g, 'api_key_id', None):
         return True
     try:
@@ -49,7 +50,8 @@ def _caller_covers(api_key):
     return all(_caller_can_grant(p, owner_perms) for p in perms)
 
 
-_NOT_COVERED = 'An API key can only manage a key whose permissions it holds itself'
+_NOT_COVERED = ('An API key can only manage a key whose every permission it and its owner both '
+                'still hold; a signed-in session manages it')
 
 
 _WIDER_NETWORKS = 'An API key can only create or regenerate a key limited to its own networks'

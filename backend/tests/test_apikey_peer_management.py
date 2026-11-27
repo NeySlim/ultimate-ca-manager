@@ -81,3 +81,23 @@ def test_a_session_still_manages_every_key(app, keys):
     assert _send(session, 'DELETE', f'/api/v2/account/apikeys/{wide_id}').status_code == 200
     assert _send(session, 'DELETE', f'/api/v2/account/apikeys/{wide_id}').status_code == 200
     assert _state(app, wide_id) is None
+
+
+def test_a_scope_the_owner_lost_leaves_the_key_to_a_session(app, keys):
+    """Even a `*` key cannot manage a sibling holding a scope its owner no longer has."""
+    from models import User
+    session = keys['session']
+    r = _send(session, 'POST', '/api/v2/account/apikeys',
+              {'name': 'writer', 'permissions': ['write:certificates'], 'password': PASSWORD})
+    assert r.status_code == 201, r.data
+    writer_id = r.get_json()['data']['id']
+    with app.app_context():
+        User.query.filter_by(username='apikey_peer_owner').one().role = 'viewer'
+        db.session.commit()
+    wide_id, wide = keys['wide']
+    r = _send(app.test_client(), 'DELETE', f'/api/v2/account/apikeys/{writer_id}', headers=wide)
+    assert r.status_code == 403
+    message = r.get_json()['message']
+    assert 'owner' in message and 'session' in message, message
+    assert _state(app, writer_id) == ('writer', True)
+    assert _send(session, 'DELETE', f'/api/v2/account/apikeys/{writer_id}').status_code == 200
