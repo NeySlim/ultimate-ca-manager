@@ -257,4 +257,4 @@ class TestHttp01FailureProblemTypes:
             assert service.validate_http01_challenge(challenge, account) is False
             problem = json.loads(challenge.error)
             assert problem['type'] == 'urn:ietf:params:acme:error:connection'
-            assert 'timed out' in problem['detail'].lower()
+            assert problem['detail'] == 'Timed out: read timed out'
