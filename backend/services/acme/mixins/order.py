@@ -190,9 +190,10 @@ class OrderMixin:
                     wildcard=is_wildcard,
                     expires=utc_now() + timedelta(days=7),
                 )
+                # No challenge was performed, so none is listed (RFC 8555
+                # §7.1.4) and CAA validationmethods cannot match it (RFC 8657 §4).
                 db.session.add(auth)
                 db.session.flush()
-                self._create_challenges(auth, status='valid', validated=utc_now())
                 try:
                     db.session.commit()
                 except Exception as e:

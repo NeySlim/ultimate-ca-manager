@@ -162,13 +162,14 @@ class TestIssueMatching:
         assert ok is False
         assert 'validationmethods' in reason
 
-    def test_validationmethods_with_indeterminable_method_allows(self):
-        # Reused/auto-approved authorizations have no single determinable
-        # challenge type — the parameter is not enforced in that case.
+    def test_validationmethods_without_a_validation_method_denies(self):
+        # RFC 8657 §4: only a listed method authorizes; an auto-approved
+        # authorization used none, so the property cannot authorize it.
         rec = _FakeCAA('issue', 'ucm.example.com; validationmethods=dns-01')
         with _patch({'example.com': [rec]}):
-            ok, _ = check_caa('www.example.com', ['ucm.example.com'])
-        assert ok is True
+            ok, reason = check_caa('www.example.com', ['ucm.example.com'])
+        assert ok is False
+        assert 'validationmethods' in reason
 
     def test_validationmethods_with_wrong_method_denies(self):
         rec = _FakeCAA('issue', 'ucm.example.com; validationmethods=dns-01')

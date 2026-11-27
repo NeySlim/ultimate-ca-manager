@@ -53,26 +53,18 @@ def _parameters_allow(
 
     method_parameters = parameters.get('validationmethods', [])
     if method_parameters:
+        # RFC 8657 §4: only a listed method authorizes. An authorization that
+        # names no method (auto-approved) used none, so it cannot match.
         normalized_method = validation_method.lower() if validation_method else None
-        if normalized_method is None:
-            # Reused or auto-approved authorizations have no single
-            # determinable challenge type; denying here would fail orders
-            # whose original validation was compliant.
-            logger.warning(
-                'CAA validationmethods present but the validation method is '
-                'indeterminable (reused/auto-approved authorization); '
-                'not enforcing this parameter'
-            )
-        else:
-            allowed_method_sets = [
-                {method.strip().lower() for method in value.split(',') if method.strip()}
-                for value in method_parameters
-            ]
-            if any(
-                normalized_method not in allowed_methods
-                for allowed_methods in allowed_method_sets
-            ):
-                return False, 'validationmethods does not allow the validation method used'
+        allowed_method_sets = [
+            {method.strip().lower() for method in value.split(',') if method.strip()}
+            for value in method_parameters
+        ]
+        if normalized_method is None or any(
+            normalized_method not in allowed_methods
+            for allowed_methods in allowed_method_sets
+        ):
+            return False, 'validationmethods does not allow the validation method used'
 
     return True, None
 
