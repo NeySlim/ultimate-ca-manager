@@ -56,7 +56,7 @@ class IssuanceMixin:
                 validation_methods[domain] = tuple(sorted(valid_methods))
             else:
                 validation_methods[domain] = None
-                logger.warning("No validated ACME challenge for %s", domain)
+                logger.info("No validated ACME challenge for %s", domain)
 
         return account_url, validation_methods
 

@@ -10,7 +10,9 @@ from models import db
 pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
 
 
-def test_auto_approved_authorizations_name_no_validation_method(app, monkeypatch):
+def test_auto_approved_authorizations_name_no_validation_method(app, monkeypatch, caplog):
+    import logging
+
     from models.acme_models import AcmeAccount
     from services.acme.acme_service import AcmeService
 
@@ -32,8 +34,12 @@ def test_auto_approved_authorizations_name_no_validation_method(app, monkeypatch
         assert authorizations and all(a.status == 'valid' for a in authorizations)
         assert [c.type for a in authorizations for c in a.challenges if c.status == 'valid'] == []
 
-        _, methods = service._caa_request_context(order)
+        with caplog.at_level(logging.DEBUG, logger='services.acme.mixins.issuance'):
+            _, methods = service._caa_request_context(order)
         assert methods == {'www.caa-auto.example': None, '*.caa-auto.example': None}
+        # Expected on every auto-approved finalization: informational, not a warning
+        noted = [r for r in caplog.records if 'No validated ACME challenge' in r.getMessage()]
+        assert noted and all(r.levelno == logging.INFO for r in noted)
 
 
 def test_auto_approved_pre_authorization_reused_by_an_order_names_no_method(app, monkeypatch):
