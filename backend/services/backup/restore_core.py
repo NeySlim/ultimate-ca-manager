@@ -1359,7 +1359,7 @@ class RestoreCoreMixin:
                 existing.status = acme_data.get('status', 'valid')
                 existing.terms_of_service_agreed = acme_data.get('terms_of_service_agreed', False)
                 existing.external_account_binding = acme_data.get('external_account_binding')
-                put_back(existing, held)
+                put_back('acme_accounts', existing, held)
             else:
                 new_acme = AcmeAccount(
                     account_id=account_id,
@@ -1409,7 +1409,7 @@ class RestoreCoreMixin:
                 existing.revoked_at = revoked_at
                 existing.revoked_by_user_id = eab.get('revoked_by_user_id')
                 existing.expires_at = expires_at
-                put_back(existing, held)
+                put_back('acme_eab_credentials', existing, held)
             else:
                 new_eab = AcmeEabCredential(
                     kid=kid,

@@ -155,6 +155,10 @@ def _revoke_eab(row):
     row.status, row.revoked_at = 'revoked', _WHEN
 
 
+def _use_eab(row):
+    row.status, row.used_at, row.used_by_account_id = 'used', _WHEN, 'acct-here'
+
+
 def _make_dns_update_key():
     from models.acme_client_account import AcmeClientAccount
     from models.acme_dns_update import AcmeDnsUpdateKey
@@ -183,7 +187,7 @@ def _model(path):
     return getattr(__import__(module, fromlist=[name]), name)
 
 
-# section: (model, sections archived, make, revoke here (id or row), columns of the revocation,
+# section[:variant]: (model, sections archived, make, revoke here (id or row), columns of the revocation,
 #           is the row revoked, archive row edit that revokes it)
 CASES = {
     'ssh_certificates': (
@@ -216,6 +220,12 @@ CASES = {
         'models.acme_models:AcmeEabCredential', ('acme_eab_credentials',), _make_eab,
         ('row', _revoke_eab), ('status', 'revoked_at'), lambda row: row.status == 'revoked',
         {'status': 'revoked', 'revoked_at': '2026-06-01T12:00:00'}),
+    # Single-use: a credential consumed here never registers a second account
+    'acme_eab_credentials:used': (
+        'models.acme_models:AcmeEabCredential', ('acme_eab_credentials',), _make_eab,
+        ('row', _use_eab), ('status', 'used_at', 'used_by_account_id'),
+        lambda row: row.status == 'used',
+        {'status': 'used', 'used_at': '2026-06-01T12:00:00', 'used_by_account_id': 'acct-archive'}),
     'acme_dns_update_keys': (
         'models.acme_dns_update:AcmeDnsUpdateKey', ('acme_dns_update_keys',), _make_dns_update_key,
         ('row', _set(status='revoked', revoked_at=_WHEN)), ('status', 'revoked_at'),
@@ -260,6 +270,7 @@ def _krl(row_id):
 @pytest.mark.parametrize('section', sorted(CASES))
 def test_a_merge_keeps_a_revocation_made_after_the_archive(installation, section):
     path, sections, make, how, columns, revoked, _edit = CASES[section]
+    section = section.split(':')[0]
     model = _model(path)
     row_id = make()
     master, payload = _archive(sections)
@@ -280,6 +291,7 @@ def test_a_merge_keeps_a_revocation_made_after_the_archive(installation, section
 @pytest.mark.parametrize('section', sorted(CASES))
 def test_an_archive_still_revokes_a_row_live_here(installation, section):
     path, sections, make, _how, columns, revoked, edit = CASES[section]
+    section = section.split(':')[0]
     model = _model(path)
     row_id = make()
     master, payload = _archive(sections)
@@ -322,4 +334,24 @@ def test_every_section_with_a_revoked_state_is_covered():
     # a revoked serial or compromised key is a record of a revocation, added, never lowered
     assert revocable - {'certificates', 'certificate_authorities', 'revoked_serials',
                         'compromised_keys'} <= set(KEPT_STATES)
-    assert set(KEPT_STATES) == set(CASES)
+    assert set(KEPT_STATES) == {name.split(':')[0] for name in CASES}
+
+
+def test_an_archive_revoking_a_credential_used_here_keeps_its_use(installation):
+    """revoked outranks used: the archive's revocation applies, the account bound here stays bound."""
+    from models.acme_models import AcmeEabCredential
+    row_id = _make_eab()
+    master, payload = _archive(('acme_eab_credentials',))
+    row = db.session.get(AcmeEabCredential, row_id)
+    payload = {'acme_eab_credentials': copy.deepcopy(list(payload['acme_eab_credentials']))}
+    archived = [entry for entry in payload['acme_eab_credentials'] if entry.get('kid') == row.kid]
+    archived[0].update(status='revoked', revoked_at='2026-07-01T12:00:00')
+    _use_eab(row)
+    db.session.commit()
+
+    _merge(master, payload)
+
+    _row, after = _state(AcmeEabCredential, row_id,
+                         ('status', 'used_at', 'used_by_account_id', 'revoked_at'))
+    assert after == {'status': 'revoked', 'used_at': _WHEN, 'used_by_account_id': 'acct-here',
+                     'revoked_at': datetime(2026, 7, 1, 12, 0, 0)}, after

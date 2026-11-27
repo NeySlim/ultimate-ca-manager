@@ -103,7 +103,7 @@ def _apply_or_leave_out(section_name, section, instance, row, columns, attribute
     held = None if new else held_here(section_name, instance, plan.merging)
     try:
         _apply_row(section_name, section, instance, row, columns, attribute_of, plan, new)
-        put_back(instance, held)
+        put_back(section_name, instance, held)
     except UnplaceableLegacyRow as left_out:
         if new and state.persistent:
             db.session.delete(instance)
