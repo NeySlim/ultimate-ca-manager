@@ -7,6 +7,12 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ---
 
+## [Unreleased]
+
+### Fixed
+
+- An installation without a Base URL ran `hostname -f` on every request (60 to 75 ms each on a Raspberry Pi); the name is now read once at startup, so a host name change takes effect after a service restart.
+
 ## [3.1] - 2026-11-27
 
 ### Added
