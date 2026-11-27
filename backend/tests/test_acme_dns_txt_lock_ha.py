@@ -177,3 +177,14 @@ def test_the_lock_session_has_the_server_keepalives(app, ha, on_postgresql):
     locking = {conn for conn, statement in ran if 'pg_try_advisory_lock' in statement}
     assert len(locking) == 1
     assert any(conn in locking and 'tcp_user_timeout' in statement for conn, statement in ran)
+
+
+@pytest.mark.postgres
+def test_keepalives_refused_by_the_server_still_take_the_lock(app, ha, other_node, monkeypatch, caplog):
+    """As for the leader lock: missing keepalives are a warning, never a failed publication."""
+    from services import scheduler_leader
+    monkeypatch.setattr(scheduler_leader, '_SERVER_TIMEOUTS_SQL', text('SELECT ucm_no_such_function()'))
+    with caplog.at_level('WARNING', logger=dns_txt_lock.__name__), app.app_context(), \
+            txt_record_lock(NAME):
+        assert _holder(other_node, dns_txt_lock.advisory_key(NAME)) is not None
+    assert any('keepalives' in record.getMessage() for record in caplog.records)
