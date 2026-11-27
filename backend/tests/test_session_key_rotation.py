@@ -568,3 +568,12 @@ def test_docker_without_encryption_refuses_a_file_rotation_it_cannot_apply(app, 
     assert r.status_code == 409, r.data
     assert 'UCM_SECRET_KEY' in r.get_json()['message']
     assert not file_path and app.config['SECRET_KEY'] == key
+
+
+def test_secrets_status_tells_the_screen_a_file_rotation_is_refused_in_docker(app, auth_client, monkeypatch):
+    """The screen disables the rotation the API would refuse with 409: it reads docker from the status."""
+    monkeypatch.setattr('config.settings.is_docker', lambda: True)
+    session = auth_client.get(STATUS).get_json()['data']['session_secret']
+    assert session['rotation'] == 'environment_file' and session['docker'] is True
+    monkeypatch.setattr('config.settings.is_docker', lambda: False)
+    assert auth_client.get(STATUS).get_json()['data']['session_secret']['docker'] is False

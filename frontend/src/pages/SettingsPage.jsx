@@ -1056,7 +1056,7 @@ export default function SettingsPage() {
       URL.revokeObjectURL(url)
       showSuccess(t('settings.masterKeyDownloaded'))
     } catch (e) {
-      showError(e.message || t('settings.masterKeyDownloadFailed'))
+      showError(e?.message || t('settings.masterKeyDownloadFailed'))
     }
   }
 
