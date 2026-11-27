@@ -33,8 +33,11 @@ class KeyRecoveryRequest(db.Model):
 
     requested_by = db.Column(db.String(120), nullable=False)
     requested_at = db.Column(db.DateTime, default=utc_now, nullable=False)
+    # Who asked and who decided, by account id: a later account may reuse a deleted one's name
+    requested_by_id = db.Column(db.Integer)
 
     decided_by = db.Column(db.String(120))
+    decided_by_id = db.Column(db.Integer)
     decided_at = db.Column(db.DateTime)
     decision_note = db.Column(db.Text)
 
@@ -52,8 +55,10 @@ class KeyRecoveryRequest(db.Model):
             'reason': self.reason,
             'status': self.status,
             'requested_by': self.requested_by,
+            'requested_by_id': self.requested_by_id,
             'requested_at': _iso(self.requested_at),
             'decided_by': self.decided_by,
+            'decided_by_id': self.decided_by_id,
             'decided_at': _iso(self.decided_at),
             'decision_note': self.decision_note,
             'recovered_by': self.recovered_by,

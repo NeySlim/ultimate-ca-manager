@@ -13,6 +13,8 @@ const stable = vi.hoisted(() => ({
   i18n: null,
   notify: { showSuccess: () => {}, showError: () => {}, showInfo: () => {}, showWarning: () => {} },
   perms: [], username: 'bob',
+  // The server names the requester by account id
+  ids: { alice: 11, bob: 12, carol: 13 },
 }))
 vi.mock('react-i18next', () => ({ useTranslation: () => stable.i18n, Trans: ({ children }) => children, initReactI18next: { type: '3rdParty', init: () => {} } }))
 import { frI18n } from '../../components/work/__tests__/frI18n'
@@ -27,7 +29,7 @@ vi.mock('../../contexts', () => ({
 vi.mock('../../hooks', () => ({
   usePermission: () => ({
     canWrite: () => true, canRead: () => true, canDelete: () => true,
-    hasPermission: (p) => stable.perms.includes(p), username: stable.username,
+    hasPermission: (p) => stable.perms.includes(p), username: stable.username, userId: stable.ids[stable.username],
   }),
 }))
 const api = vi.hoisted(() => ({ list: vi.fn(), get: vi.fn(), approve: vi.fn(), reject: vi.fn(), recover: vi.fn() }))
@@ -37,7 +39,7 @@ import { renderAtUrl } from '../../test/dockUrl'
 import KeyRecoveryPage from '../KeyRecoveryPage'
 
 const ADMIN = ['admin:key_recovery', 'write:key_recovery', 'read:key_recovery']
-const req = (id, status, cn, by = 'alice') => ({ id, status, cert_id: id, cert_cn: cn, reason: 'lost', requested_by: by, requested_at: new Date(Date.now() - 3 * 3600000).toISOString() })
+const req = (id, status, cn, by = 'alice') => ({ id, status, cert_id: id, cert_cn: cn, reason: 'lost', requested_by: by, requested_by_id: stable.ids[by], requested_at: new Date(Date.now() - 3 * 3600000).toISOString() })
 let rows
 let dual
 const renderPage = (path = '/key-recovery') => render(<MemoryRouter initialEntries={[path]}><KeyRecoveryPage /></MemoryRouter>)

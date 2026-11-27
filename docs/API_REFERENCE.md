@@ -2483,7 +2483,7 @@ Opens a request (`201`). `reason` is required and at most 2000 characters; `400`
 GET /api/v2/key-recovery?status=pending
 GET /api/v2/key-recovery/{id}
 ```
-The list returns `requests` and `dual_control`, whether the approver must differ from the requester; it pages with `page` and `per_page` (default 500, 500 at most), `meta` carries `total`, and it sorts by `sort_by`: `id` (default, newest first), `requested_at`, `status` (pending, approved, recovered, rejected, cancelled), `cert_cn`, `requested_by` (see [Sorting](#sorting)). `GET /{id}` reads one request whatever its age.
+The list returns `requests` and `dual_control`, whether the approver must differ from the requester; it pages with `page` and `per_page` (default 500, 500 at most), `meta` carries `total`, and it sorts by `sort_by`: `id` (default, newest first), `requested_at`, `status` (pending, approved, recovered, rejected, cancelled), `cert_cn`, `requested_by` (see [Sorting](#sorting)). `GET /{id}` reads one request whatever its age. A request carries `requested_by` and `decided_by`, the account names, and `requested_by_id` and `decided_by_id`, their account ids (`null` on a request opened before 3.1).
 
 ```http
 POST /api/v2/key-recovery/{id}/approve
@@ -2492,7 +2492,7 @@ Content-Type: application/json
 
 { "note": "Ticket 1234" }
 ```
-`admin:key_recovery`. `note` is optional; a longer note is cut to its first 2000 characters. `409` when the request is no longer pending. `approve` answers `403` when dual control is on and the caller is the requester, and `410` when the certificate no longer exists.
+`admin:key_recovery`. `note` is optional; a longer note is cut to its first 2000 characters. `409` when the request is no longer pending. `approve` answers `403` when dual control is on and the caller is the requester (the same account id, or the same name), and `410` when the certificate no longer exists.
 
 ```http
 POST /api/v2/key-recovery/{id}/recover
@@ -2500,7 +2500,7 @@ Content-Type: application/json
 
 { "password": "at-least-8-chars", "legacy": false }
 ```
-Returns the key and certificate as a PKCS#12 download, once, after approval. `password` is required (`400` when it does not meet the export password rules); `legacy` selects the 3DES/SHA-1 profile. These are the only options, in a JSON object body, read as described under Export Certificate (where the options go). `409` when the request is not approved, `403` unless the caller is the requester or holds `admin:key_recovery`, `410` when the certificate or key is gone.
+Returns the key and certificate as a PKCS#12 download, once, after approval. `password` is required (`400` when it does not meet the export password rules); `legacy` selects the 3DES/SHA-1 profile. These are the only options, in a JSON object body, read as described under Export Certificate (where the options go). `409` when the request is not approved, a concurrent download included: the first one claims the request and the others get `409`; a download that fails to build the bundle leaves it approved. `403` unless the caller is the requester's account (by id: a later account with the same name is not) or holds `admin:key_recovery`, `410` when the certificate or key is gone.
 
 ---
 

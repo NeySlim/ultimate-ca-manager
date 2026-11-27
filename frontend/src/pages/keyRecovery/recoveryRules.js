@@ -4,20 +4,23 @@
  *  - approve: admin:key_recovery, and with dual control on, not on one's own request
  *  - reject: admin:key_recovery
  *  - recover: write:key_recovery, by the requester or an administrator of key recovery
+ * The requester is the account id the request names; a request kept from before ids has none,
+ * and then only its name holds an approval back.
  */
 export const recoveryName = (r) => r.cert_cn || r.cert_refid || `#${r.cert_id}`
 
 export const RECOVERY_TONES = { pending: 'warn', approved: 'good', rejected: 'bad', recovered: 'good', cancelled: 'muted' }
 
-/** @param {{ hasPermission: Function, username: string, dualControl: boolean }} who */
-export function recoveryRights(req, { hasPermission, username, dualControl }) {
+/** @param {{ hasPermission: Function, username: string, userId: number|null, dualControl: boolean }} who */
+export function recoveryRights(req, { hasPermission, username, userId = null, dualControl }) {
   const admin = hasPermission('admin:key_recovery')
-  const own = !!username && req?.requested_by === username
+  const ownById = req?.requested_by_id != null && userId != null && req.requested_by_id === userId
+  const ownByName = !!username && req?.requested_by === username
   const pending = req?.status === 'pending'
   return {
-    approve: pending && admin && !(dualControl && own),
+    approve: pending && admin && !(dualControl && (ownById || ownByName)),
     reject: pending && admin,
-    recover: req?.status === 'approved' && hasPermission('write:key_recovery') && (own || admin),
+    recover: req?.status === 'approved' && hasPermission('write:key_recovery') && (ownById || admin),
   }
 }
 
