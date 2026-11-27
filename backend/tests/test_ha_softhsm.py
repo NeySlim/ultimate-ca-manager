@@ -358,11 +358,10 @@ def test_default_token_without_ha_follows_hsm_auto_init(flag, auto, expected):
 
 
 def _softhsm_block():
-    """The SoftHSM block of the image entrypoint, alone: the whole script never runs here."""
+    """The SoftHSM step of the image entrypoint, alone: the whole script never runs here."""
     lines = (ROOT / 'docker' / 'entrypoint.sh').read_text().splitlines()
-    start = next(i for i, line in enumerate(lines) if line.startswith('if command -v softhsm2-util'))
-    end = next(i for i in range(start, len(lines)) if lines[i] == 'fi')
-    return '\n'.join(lines[start:end + 1])
+    assert 'ucm_softhsm_default_token' in lines
+    return 'ucm_softhsm_default_token'
 
 
 def _run_softhsm_block(tmp_path, env, slots='', init_rc=0):
@@ -446,3 +445,26 @@ def test_a_failed_token_creation_keeps_no_pin_neg(tmp_path):
     out, _calls = _run_softhsm_block(tmp_path, {}, init_rc=1)
     assert not (tmp_path / 'data' / 'softhsm' / '.default-pin').exists()
     assert 'PIN=unset' in out
+
+
+def _kept_pin(tmp_path):
+    pin_file = tmp_path / 'data' / 'softhsm' / '.default-pin'
+    pin_file.parent.mkdir(parents=True)
+    pin_file.write_text('fedcba9876543210\n')
+    return pin_file
+
+
+@pytest.mark.parametrize('slots, env', [
+    (DEFAULT_SLOT, {'FIPS_REQUESTED': '1', 'HSM_AUTO_INIT': 'false'}),
+    (DEFAULT_SLOT, {'UCM_HA': '1'}),
+    ('', {'FIPS_REQUESTED': '1', 'HSM_AUTO_INIT': 'false'}),
+    ('', {'UCM_HA': 'true'}),
+    ('', {'HSM_AUTO_INIT': 'false'}),
+], ids=['fips', 'ha', 'fips-no-token', 'ha-no-token', 'auto-init-off-no-token'])
+def test_a_pin_no_row_can_be_registered_with_is_removed(tmp_path, slots, env):
+    # FIPS and HA never register SoftHSM-Default, and without the token the PIN opens nothing
+    pin_file = _kept_pin(tmp_path)
+    out, calls = _run_softhsm_block(tmp_path, env, slots=slots)
+    assert '--init-token' not in calls
+    assert not pin_file.exists()
+    assert 'PIN=unset' in out and 'CREATED=unset' in out

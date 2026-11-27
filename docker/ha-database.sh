@@ -379,3 +379,53 @@ ucm_softhsm_auto_init() {
     ucm_ha_active && return 1
     [ "${HSM_AUTO_INIT:-true}" = "true" ]
 }
+
+# SoftHSM token UCM-Default: created when ucm_softhsm_auto_init allows it, its PIN handed to the
+# application (HSM_DEFAULT_PIN, HSM_TOKEN_CREATED). The PIN stays in the data volume until the
+# application has registered the token (auto_register_softhsm removes it): a first start that dies
+# before that hands it again. Where no row can be registered (FIPS, HA, no token), it is removed.
+ucm_softhsm_default_token() {
+    if ! command -v softhsm2-util >/dev/null 2>&1; then
+        echo -e "${YELLOW:-}⚠️  SoftHSM not available - HSM features disabled${NC:-}"
+        return 0
+    fi
+    local pin_file="${DATA_PATH:?}/softhsm/.default-pin" kept_pin pin_tmp
+    if softhsm2-util --show-slots 2>/dev/null | grep -qE '^ *Label: +UCM-Default *$'; then
+        echo -e "${GREEN:-}🔐 SoftHSM tokens found${NC:-}"
+        if [ "${FIPS_REQUESTED:-0}" = 1 ] || ucm_ha_active; then
+            # Neither registers SoftHSM-Default; a token never registered holds no key
+            rm -f "$pin_file"
+        elif [ -s "$pin_file" ] && kept_pin=$(head -n 1 "$pin_file" 2>/dev/null) && [ -n "$kept_pin" ]; then
+            echo -e "${YELLOW:-}   ⚠️  Token 'UCM-Default' not registered yet: its PIN is handed to the application again${NC:-}"
+            export HSM_DEFAULT_PIN="$kept_pin"
+            export HSM_TOKEN_CREATED=1
+        fi
+    elif ucm_softhsm_auto_init; then
+        echo -e "${CYAN:-}🔐 Initializing SoftHSM default token...${NC:-}"
+        HSM_PIN="${HSM_PIN:-$(openssl rand -hex 8)}"
+        HSM_SO_PIN="${HSM_SO_PIN:-$(openssl rand -hex 8)}"
+        # Written before the token exists (mktemp: mode 600, renamed over the name)
+        if pin_tmp=$(mktemp "$pin_file.XXXXXX" 2>/dev/null); then
+            if ! { printf '%s\n' "$HSM_PIN" > "$pin_tmp" && mv -f -T "$pin_tmp" "$pin_file"; }; then
+                rm -f "$pin_tmp"
+            fi
+        fi
+        [ -s "$pin_file" ] || echo -e "${YELLOW:-}   ⚠️  $pin_file could not be written: a start that stops before UCM registers the token loses its PIN${NC:-}"
+        # The PIN is handed to the app only for a token that now exists.
+        if softhsm2-util --init-token --free --label "UCM-Default" \
+            --pin "$HSM_PIN" --so-pin "$HSM_SO_PIN" >/dev/null 2>&1; then
+            echo -e "${GREEN:-}   ✅ SoftHSM token 'UCM-Default' initialized${NC:-}"
+            export HSM_DEFAULT_PIN="$HSM_PIN"
+            export HSM_TOKEN_CREATED=1
+        else
+            rm -f "$pin_file"
+            echo -e "${YELLOW:-}   ⚠️  SoftHSM token init failed${NC:-}"
+        fi
+    elif ucm_ha_active; then
+        rm -f "$pin_file"
+        echo -e "${YELLOW:-}🔐 SoftHSM default token not created in HA mode (a token stays on one node)${NC:-}"
+    else
+        rm -f "$pin_file"
+        echo -e "${YELLOW:-}🔐 No SoftHSM token 'UCM-Default' and HSM_AUTO_INIT is off${NC:-}"
+    fi
+}

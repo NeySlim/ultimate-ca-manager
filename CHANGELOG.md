@@ -77,7 +77,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 ### Fixed
 
 - Packages: on a host whose name is longer than 64 characters, generating the HTTPS certificate failed without a message (the DEB install stopped, the RPM install went on without it); the common name is now the first label, cut at 64, the whole name stays in the subject alternative name, and a failure prints the OpenSSL error.
-- Docker: when the first start stopped before UCM registered the SoftHSM token it had just created (database not ready, `docker stop`), the token's PIN was lost and `SoftHSM-Default` was never created; the PIN is now kept in the data volume until the provider holds it.
+- Docker: when the first start stopped before UCM registered the SoftHSM token it had just created (database not ready, `docker stop`), the token's PIN was lost and `SoftHSM-Default` was never created; the PIN is now kept in the data volume until the provider holds it, and removed at start in FIPS or HA mode or once the token is gone.
 - Helm chart: an HA render without cluster access (`helm template`, GitOps) drew a new `UCM_SECRET_KEY` at each render without restarting the pods, so pods started from two renders had different session keys; it now refuses to render until `secrets.secretKey` is set.
 - ACME server: a key-change refused because the new key belongs to another account now names that account in a `Location` header (RFC 8555 §7.3.5).
 - ACME server: the CAA search stopped below the top-level label, so a record at the apex of a single-label zone (`internal`, `corp`) was ignored; every ancestor short of the root is now searched (RFC 8659 §3).
