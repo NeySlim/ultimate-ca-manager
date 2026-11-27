@@ -72,7 +72,7 @@ def test_a_large_v4_archive_is_read_within_bounded_memory(app, tmp_path, monkeyp
     monkeypatch.setattr(section_store, 'store_directory', lambda: str(tmp_path))
     seen = {}
 
-    def stop_at_the_plan(cls, backup_data, pruned=frozenset()):
+    def stop_at_the_plan(cls, backup_data, pruned=frozenset(), merging=False):
         seen['peak'] = tracemalloc.get_traced_memory()[1]
         seen['rows'] = section_store.section_length(backup_data, 'certificates')
         raise _PlanReached()
