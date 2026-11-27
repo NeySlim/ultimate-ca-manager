@@ -815,10 +815,13 @@ def _jobs_end_in_their_module(request):
     with runner._local_lock:
         running = dict(runner._local_done)
     left = [job_id for job_id, done in running.items() if not done.wait(60)]
-    if left:
-        import warnings
-        warnings.warn(f'{os.path.basename(str(request.fspath))} left jobs running: {", ".join(left)}',
-                      stacklevel=1)
+    if not left:
+        return
+    message = f'{os.path.basename(str(request.fspath))} left jobs running: {", ".join(left)}'
+    if os.environ.get('UCM_TEST_LEAK_MODE', 'warn') == 'fail':
+        pytest.fail(message)
+    import warnings
+    warnings.warn(message, stacklevel=1)
 
 
 @pytest.fixture(scope='module')
