@@ -13,6 +13,7 @@ import {
 import { sshHostsService, sshCasService } from '../services'
 import { useNotification } from '../contexts'
 import { usePermission, useClipboard } from '../hooks'
+import { useInFlight } from '../hooks/useInFlight'
 import { useDockSelection } from '../components/atelier/useDockParam'
 import { copyRow, fact } from '../components/atelier/facts'
 import { PhoneMoreActions } from './pki/PhoneMoreActions'
@@ -64,6 +65,9 @@ export default function SSHHostsPage() {
   const [caFilter, setCaFilter] = useState('')
   const [search, setSearch] = useState('')
   const [dialog, setDialog] = useState(null)
+  // The token is shown once: its dialog stays open, and is not submitted twice, while it is created
+  const [creatingToken, runCreateToken] = useInFlight()
+  const closeToken = () => { if (!creatingToken) setDialog(null) }
   const dock = useDockSelection(hosts, { ready: !loading, sections: HOST_SECTIONS })
   const open = view === 'hosts' ? dock.selected : null
 
@@ -211,8 +215,8 @@ export default function SSHHostsPage() {
   return (
     <Zone dock={hostDock} after={<>
       {dialog === 'token' && (
-        <AtelierDialog title={t('sshHosts.token.create')} subtitle={t('sshHosts.token.createHint')} size="wide" onClose={() => setDialog(null)} returnTo="ssh-token-new">
-          <TokenForm cas={cas} canListCas={canListCas} onDone={load} onCancel={() => setDialog(null)} />
+        <AtelierDialog title={t('sshHosts.token.create')} subtitle={t('sshHosts.token.createHint')} size="wide" onClose={closeToken} returnTo="ssh-token-new">
+          <TokenForm cas={cas} canListCas={canListCas} onDone={load} onCancel={closeToken} busy={creatingToken} run={runCreateToken} />
         </AtelierDialog>
       )}
     </>}>
@@ -286,7 +290,7 @@ export default function SSHHostsPage() {
   )
 }
 
-function TokenForm({ cas, canListCas, onDone, onCancel }) {
+function TokenForm({ cas, canListCas, onDone, onCancel, busy, run }) {
   const { t } = useTranslation()
   const { showSuccess, showError } = useNotification()
   const { copy, isCopied } = useClipboard()
@@ -296,33 +300,31 @@ function TokenForm({ cas, canListCas, onDone, onCancel }) {
   const [lifetime, setLifetime] = useState('3600')
   const [renewPercent, setRenewPercent] = useState('30')
   const [descr, setDescr] = useState('')
-  const [busy, setBusy] = useState(false)
   const [created, setCreated] = useState(null)
 
   useEffect(() => { if (cas.length && !caId) setCaId(String(cas[0].id)) }, [cas]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const submit = async (e) => {
+  const submit = (e) => {
     e.preventDefault()
-    setBusy(true)
-    try {
-      const preset = VALIDITY_PRESETS.find((p) => p.value === validity)
-      const data = {
-        ca_id: parseInt(caId, 10),
-        principals: names.split(/[\s,]+/).map((n) => n.trim()).filter(Boolean),
-        lifetime_seconds: parseInt(lifetime, 10),
-        renew_percent: parseInt(renewPercent, 10),
+    return run(async () => {
+      try {
+        const preset = VALIDITY_PRESETS.find((p) => p.value === validity)
+        const data = {
+          ca_id: parseInt(caId, 10),
+          principals: names.split(/[\s,]+/).map((n) => n.trim()).filter(Boolean),
+          lifetime_seconds: parseInt(lifetime, 10),
+          renew_percent: parseInt(renewPercent, 10),
+        }
+        if (preset?.seconds) data.validity_seconds = preset.seconds
+        if (descr.trim()) data.descr = descr.trim()
+        const res = await sshHostsService.createToken(data)
+        setCreated({ ...res.data, ca: cas.find((ca) => String(ca.id) === caId) })
+        showSuccess(t('sshHosts.token.created'))
+        onDone()
+      } catch (error) {
+        showError(error.message || t('common.operationFailed'))
       }
-      if (preset?.seconds) data.validity_seconds = preset.seconds
-      if (descr.trim()) data.descr = descr.trim()
-      const res = await sshHostsService.createToken(data)
-      setCreated({ ...res.data, ca: cas.find((ca) => String(ca.id) === caId) })
-      showSuccess(t('sshHosts.token.created'))
-      onDone()
-    } catch (error) {
-      showError(error.message || t('common.operationFailed'))
-    } finally {
-      setBusy(false)
-    }
+    })
   }
 
   if (created) {

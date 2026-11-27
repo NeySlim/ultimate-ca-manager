@@ -90,7 +90,8 @@
 .atl .modal-actions:has(>.dialog-notice){flex-wrap:wrap}
 .atl .modal-actions>.dialog-notice{order:-1;flex:1 0 100%;margin:0;align-items:center}
 .atl .modal-actions>.dialog-notice>span{flex:1;white-space:pre-line;overflow-wrap:anywhere}
-.atl .modal-actions>.dialog-notice .icon-btn{width:28px;min-height:28px;margin:-4px -6px -4px 0;color:inherit}
+/* The close button at the right edge: the text keeps its 78ch measure (adjust.css), the free room goes before the button. */
+.atl .modal-actions>.dialog-notice .icon-btn{width:28px;min-height:28px;margin:-4px -6px -4px auto;color:inherit}
 /* Tailwind's reset follows the scope in the bundle and gives a search field `textfield`: the browser's own, as in the mockup */
 .atl [type=search]{-webkit-appearance:revert;appearance:revert}
 .atl #toast.failure.tone-warn{border-left-color:var(--warn-fill)}

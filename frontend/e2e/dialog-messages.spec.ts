@@ -30,6 +30,9 @@ test('the error of a form dialog shows in the dialog, above its buttons (#456)',
   // Readable where it is: nothing covers it
   await alert.evaluate((el) => { el.id = 'e2e-dialog-alert' })
   expect(await hitInside(page, alert)).toBe(true)
+  // Its close button at the right edge of the message, however short the text
+  const [bar, cross] = await Promise.all([alert.boundingBox(), alert.getByRole('button', { name: 'Close the message' }).boundingBox()])
+  expect(bar!.x + bar!.width - (cross!.x + cross!.width)).toBeLessThanOrEqual(12)
   await alert.getByRole('button', { name: 'Close the message' }).click()
   await expect(alert).toHaveCount(0)
   await expect(dialog).toBeVisible()

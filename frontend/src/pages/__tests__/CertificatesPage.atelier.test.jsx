@@ -464,6 +464,23 @@ describe('CertificatesPage: the selection (batchbar, largeBatch)', () => {
     expect(stable.notify.showWarning).toHaveBeenCalled()
   })
 
+  it('says that a PEM export of every result stopped at the cap, as the CSV export does', async () => {
+    const blob = new Blob(['x'])
+    blob.exportedCount = 4
+    svc.bulkExport.mockResolvedValue(blob)
+    global.URL.createObjectURL = vi.fn(() => 'blob:x')
+    global.URL.revokeObjectURL = vi.fn()
+    await mount('/certificates', ROWS, 12000)
+    fireEvent.click(zone().querySelector('#select-all'))
+    fireEvent.click(screen.getByRole('button', { name: 'certificates.selectAllResults:12000' }))
+    fireEvent.click(zone().querySelector('#bulk-export'))
+    const dialog = await screen.findByTestId('bulk-export-dialog')
+    fireEvent.click(within(dialog).getByRole('radio', { name: /PEM/ }))
+    fireEvent.click(within(dialog).getByRole('button', { name: /bulkExport\.confirm/ }))
+    await waitFor(() => expect(svc.bulkExport).toHaveBeenCalled())
+    await waitFor(() => expect(stable.notify.showWarning).toHaveBeenCalledWith('table.exportTruncated:10000'))
+  })
+
   it('says why a batch export failed', async () => {
     svc.bulkExport.mockRejectedValue(Object.assign(new Error('nope'), { status: 400 }))
     await mount()

@@ -49,8 +49,8 @@ export default function ServiceStatusWidget() {
     try {
       await systemService.restartService()
       waitForRestart()
-    } catch {
-      showError(t('settings.restartFailed'))
+    } catch (e) {
+      showError(e?.message || t('settings.restartFailed'))
       setRestarting(false)
     }
   }
