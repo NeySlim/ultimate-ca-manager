@@ -79,12 +79,14 @@ class RestorePlan:
     # -- building ---------------------------------------------------------
 
     @classmethod
-    def build(cls, backup_data: Dict[str, Any], pruned=frozenset()) -> 'RestorePlan':
-        """`pruned`: the sections a replacing restore prunes; `rows_to_remove` tells theirs."""
+    def build(cls, backup_data: Dict[str, Any], pruned=frozenset(), merging=False) -> 'RestorePlan':
+        """`pruned`: the sections a replacing restore prunes; `rows_to_remove` tells theirs.
+        `merging`: a merge keeps the final states of rows here (kept_states)."""
         from ..installation import same_installation
 
         plan = cls()
         plan.pruned = frozenset(pruned)
+        plan.merging = bool(merging)
         plan.same_installation = same_installation(backup_data)
         plan._validate_shape(backup_data)
         from .audit_ids import SECTION as _AUDIT, carried_ids, ceiling

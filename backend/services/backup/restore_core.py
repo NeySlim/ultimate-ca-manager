@@ -472,7 +472,7 @@ class RestoreCoreMixin:
         expect_rows(sum(section_length(backup_data, name) for name in backup_data.keys()
                         if name in RESTORED_SECTIONS and section_kind(backup_data, name) == 'list'))
         checkpoint('plan')
-        plan = RestorePlan.build(backup_data, pruned=pruned)
+        plan = RestorePlan.build(backup_data, pruned=pruned, merging=mode == 'merge')
         plan.warnings.extend(nul_warnings + order_warnings + windows_warnings + sso_warnings)
         for warning in plan.warnings:
             logger.warning("Restore: %s", warning)
@@ -485,7 +485,6 @@ class RestoreCoreMixin:
         results['mode'] = mode
         # A merge never lowers a revocation made here, of a certificate or a CA (_kept_revocation)
         self._merging = mode == 'merge'
-        plan.merging = self._merging
         self._kept_revocations = []
         # SSH certificates revoked with their serial's revoked holder: audited after the commit
         self._ssh_aligned = {}
