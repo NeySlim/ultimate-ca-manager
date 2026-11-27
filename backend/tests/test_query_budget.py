@@ -78,6 +78,8 @@ def _measure(app, client, url):
     """(session statements, other statements) one GET runs, after a warm-up request."""
     from utils import admin_allowlist
     admin_allowlist.invalidate_cache()
+    # The expired-session purge rides a random one request in N: not part of a route's cost
+    app.session_interface.cleanup_n_requests = 0
     client.get(url)
     with app.app_context():
         engines = {db.engine}
@@ -136,6 +138,7 @@ def test_query_budget_sql_sessions(monkeypatch, asset_dir):
         pytest.skip('needs the PostgreSQL mode of the application suite')
     monkeypatch.setattr(TestingConfig, 'SESSION_TYPE', 'sqlalchemy')
     monkeypatch.setattr(TestingConfig, 'SESSION_SQLALCHEMY_TABLE', SESSION_TABLE, raising=False)
+    monkeypatch.setattr(TestingConfig, 'SESSION_CLEANUP_N_REQUESTS', 1, raising=False)
     with fresh_app() as application:
         _seed(application)
         assert application.config['SESSION_TYPE'] == 'sqlalchemy'
