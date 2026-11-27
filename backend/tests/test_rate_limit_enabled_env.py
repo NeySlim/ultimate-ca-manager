@@ -1,6 +1,11 @@
 """RATE_LIMIT_ENABLED is read once: the route limits and the tiered limiter agree on every spelling."""
+import copy
 import json
+import os
 import random
+import sys
+import time
+import types
 
 import pytest
 
@@ -35,29 +40,42 @@ def _tier_limited(client):
     return last.status_code == 429 and 'retry_after' in (last.get_json() or {})
 
 
+_STATE = ('_enabled', '_limits_loaded', '_default_limits', '_custom_limits', '_whitelist')
+
+
 @pytest.fixture
 def app_with(monkeypatch):
     from app import limiter
     from security.rate_limiter import RateLimitConfig
-    # Both are process state a server builds once: each app here starts from a new process's.
-    saved = RateLimitConfig._enabled, limiter.initialized
+    # Process state a server builds once: each app here starts from a new process's, then it is put back
+    saved = {name: copy.copy(getattr(RateLimitConfig, name)) for name in _STATE}, limiter.initialized
+    for name in [key for key in os.environ if key.startswith('RATE_LIMIT_')]:
+        monkeypatch.delenv(name)
 
     def build(value):
-        if value is None:
-            monkeypatch.delenv('RATE_LIMIT_ENABLED', raising=False)
-        else:
+        if value is not None:
             monkeypatch.setenv('RATE_LIMIT_ENABLED', value)
         RateLimitConfig._enabled, limiter.initialized = None, False
         return fresh_app()
 
     yield build
-    RateLimitConfig._enabled, limiter.initialized = saved
+    for name, kept in saved[0].items():
+        setattr(RateLimitConfig, name, kept)
+    limiter.initialized = saved[1]
+
+
+def _frozen_tier_clock(monkeypatch):
+    """The tier refills 15 tokens a minute: a slow run would earn the tenth request one back."""
+    rate_limiter = sys.modules['security.rate_limiter']  # the module the app runs, reloaded or not
+    now = time.time()
+    monkeypatch.setattr(rate_limiter, 'time', types.SimpleNamespace(time=lambda: now))
 
 
 @pytest.mark.parametrize('value', _ON + _OFF)
-def test_both_limiters_follow_the_variable(app_with, value):
+def test_both_limiters_follow_the_variable(app_with, value, monkeypatch):
     with app_with(value) as application:
         client = application.test_client()
+        _frozen_tier_clock(monkeypatch)
         route, tier = _route_limited(client), _tier_limited(client)
     expected = value not in _OFF
     assert (route, tier) == (expected, expected)

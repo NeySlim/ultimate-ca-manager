@@ -1002,6 +1002,9 @@ class HsmService:
                         "SoftHSM tokens were carried over from /var/lib/softhsm/tokens: "
                         "SoftHSM-Default opens them with the PIN it had before"
                     )
+            if not aimed_at_default:
+                # The kept PIN is UCM-Default's: a row aimed at another token never takes it
+                HsmService._drop_kept_softhsm_pin()
             return
 
         if not pin:

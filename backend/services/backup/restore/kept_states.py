@@ -34,13 +34,15 @@ KEPT_STATES = {
     'acme_dns_update_keys': (lambda row: row.status == 'revoked', ('status', 'revoked_at'), {}),
     # A recovered key is handed out once: an 'approved' archive row would hand it out again
     'key_recovery_requests': (lambda row: row.status in ('recovered', 'rejected', 'cancelled'),
-                              ('status', 'decided_by', 'decided_at', 'decision_note',
+                              ('status', 'decided_by', 'decided_by_id', 'decided_at', 'decision_note',
                                'recovered_by', 'recovered_at'), {}),
-    # A request refused, expired or cancelled here never goes back to pending (approved is not kept)
-    'approval_requests': (lambda row: row.status in ('rejected', 'expired', 'cancelled'),
-                          ('status', 'resolved_at', 'approvals'), {}),
-    'scep_requests': (lambda row: row.status == 'rejected',
-                      ('status', 'rejection_reason', 'approved_by', 'approved_at'), {}),
+    # A request decided or closed here never goes back to pending: approved again, it would issue twice.
+    # request_data holds its protocol's delivered_at: lost, EST and SCEP would deliver it again
+    'approval_requests': (lambda row: row.status in ('approved', 'rejected', 'expired', 'cancelled'),
+                          ('status', 'resolved_at', 'approvals', 'certificate_id', 'request_data'), {}),
+    # Its delivery is recorded on its approval request (request_data), kept above
+    'scep_requests': (lambda row: row.status in ('approved', 'rejected'),
+                      ('status', 'rejection_reason', 'approved_by', 'approved_at', 'cert_refid'), {}),
 }
 
 
@@ -55,10 +57,13 @@ def held_here(section_name: str, row: Any, merging: bool) -> Optional[Dict[str, 
     return {**{column: getattr(row, column) for column in columns}, **implied}
 
 
-def put_back(section_name: str, row: Any, held: Optional[Dict[str, Any]]) -> None:
-    """Write the state held here back, but for what an outranking archive state replaces."""
+def put_back(section_name: str, row: Any, held: Optional[Dict[str, Any]], plan=None) -> None:
+    """Write the state held here back, but for what an outranking archive state replaces.
+    *plan* records the columns written: relink_references leaves them as they are."""
     rule = _OUTRANKED.get(section_name)
     if held and rule is not None and rule[0](held.get('status'), getattr(row, 'status', None)):
         held = {column: held[column] for column in rule[1]}
     for column, value in (held or {}).items():
         setattr(row, column, value)
+    if held and plan is not None:
+        plan.keep(section_name, row, held)

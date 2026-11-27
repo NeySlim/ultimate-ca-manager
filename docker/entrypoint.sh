@@ -445,46 +445,7 @@ export INITIAL_ADMIN_PASSWORD_FILE="${UCM_INITIAL_ADMIN_PASSWORD_FILE}"
 # =============================================================================
 # HSM / SoftHSM AUTO-INIT
 # =============================================================================
-if command -v softhsm2-util >/dev/null 2>&1; then
-    # The PIN of a token created here stays in this file until the application has registered
-    # it (auto_register_softhsm removes it): a first start that dies before that hands it again.
-    HSM_PIN_FILE="${DATA_PATH:?}/softhsm/.default-pin"
-    if softhsm2-util --show-slots 2>/dev/null | grep -qE '^ *Label: +UCM-Default *$'; then
-        echo -e "${GREEN}🔐 SoftHSM tokens found${NC}"
-        if [ -s "$HSM_PIN_FILE" ] && HSM_KEPT_PIN=$(head -n 1 "$HSM_PIN_FILE" 2>/dev/null) && [ -n "$HSM_KEPT_PIN" ]; then
-            echo -e "${YELLOW}   ⚠️  Token 'UCM-Default' not registered yet: its PIN is handed to the application again${NC}"
-            export HSM_DEFAULT_PIN="$HSM_KEPT_PIN"
-            export HSM_TOKEN_CREATED=1
-        fi
-    elif ucm_softhsm_auto_init; then
-        echo -e "${CYAN}🔐 Initializing SoftHSM default token...${NC}"
-        HSM_PIN="${HSM_PIN:-$(openssl rand -hex 8)}"
-        HSM_SO_PIN="${HSM_SO_PIN:-$(openssl rand -hex 8)}"
-        # Written before the token exists (mktemp: mode 600, renamed over the name)
-        if HSM_PIN_TMP=$(mktemp "$HSM_PIN_FILE.XXXXXX" 2>/dev/null); then
-            if ! { printf '%s\n' "$HSM_PIN" > "$HSM_PIN_TMP" && mv -f -T "$HSM_PIN_TMP" "$HSM_PIN_FILE"; }; then
-                rm -f "$HSM_PIN_TMP"
-            fi
-        fi
-        [ -s "$HSM_PIN_FILE" ] || echo -e "${YELLOW}   ⚠️  $HSM_PIN_FILE could not be written: a start that stops before UCM registers the token loses its PIN${NC}"
-        # The PIN is handed to the app only for a token that now exists.
-        if softhsm2-util --init-token --free --label "UCM-Default" \
-            --pin "$HSM_PIN" --so-pin "$HSM_SO_PIN" >/dev/null 2>&1; then
-            echo -e "${GREEN}   ✅ SoftHSM token 'UCM-Default' initialized${NC}"
-            export HSM_DEFAULT_PIN="$HSM_PIN"
-            export HSM_TOKEN_CREATED=1
-        else
-            rm -f "$HSM_PIN_FILE"
-            echo -e "${YELLOW}   ⚠️  SoftHSM token init failed${NC}"
-        fi
-    elif ucm_ha_active; then
-        echo -e "${YELLOW}🔐 SoftHSM default token not created in HA mode (a token stays on one node)${NC}"
-    else
-        echo -e "${YELLOW}🔐 No SoftHSM token 'UCM-Default' and HSM_AUTO_INIT is off${NC}"
-    fi
-else
-    echo -e "${YELLOW}⚠️  SoftHSM not available - HSM features disabled${NC}"
-fi
+ucm_softhsm_default_token
 
 echo -e "${GREEN}🚀 Starting UCM v${UCM_VERSION}...${NC}"
 echo -e "${CYAN}   Access: https://${UCM_FQDN}:${UCM_HTTPS_PORT}${NC}"

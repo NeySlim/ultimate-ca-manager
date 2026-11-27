@@ -270,14 +270,19 @@ def _live_certificates_of_key(host):
 
 def _sweepable(host):
     """Live certificates of the revoked *host*'s key that its revocation owes to the KRL: issued
-    before it, or by its renewal, and before the key was enrolled again as an unrevoked host."""
-    successor = SSHHost.query.filter(
+    before it, or by its renewal, while the key was enrolled as this host. A certificate belongs to
+    the host of its key enrolled last before it was signed, revoked or not."""
+    others = [h.enrolled_at for h in SSHHost.query.filter(
         SSHHost.ssh_ca_id == host.ssh_ca_id, SSHHost.fingerprint == host.fingerprint,
-        SSHHost.revoked_at.is_(None)).first()
+        SSHHost.id != host.id)]
+    successor = min((at for at in others if at > host.enrolled_at), default=None)
+    predecessor = any(at <= host.enrolled_at for at in others)
     ids = []
     for cert_id in _live_certificates_of_key(host):
         cert = db.session.get(SSHCertificate, cert_id)
-        if successor is not None and cert.created_at >= successor.enrolled_at:
+        if successor is not None and cert.created_at >= successor:
+            continue
+        if predecessor and cert.created_at < host.enrolled_at:
             continue
         if cert.created_at <= host.revoked_at or cert.source == 'renewal':
             ids.append(cert_id)
@@ -326,6 +331,8 @@ def revoke_host(host_id, reason='host revoked', username=None):
 
 
 REVOKED_HOST_SWEEP_SECONDS = 300
+# A revocation younger than this is its request's to finish: the task acts in no one's name meanwhile
+REVOKED_HOST_GRACE_SECONDS = REVOKED_HOST_SWEEP_SECONDS
 
 
 def sweep_revoked_hosts():
@@ -333,7 +340,9 @@ def sweep_revoked_hosts():
     from services.audit_service import AuditService
     live = {}  # per CA, the keys holding a live certificate: one read per CA, not per host
     total = 0
-    for host in SSHHost.query.filter(SSHHost.revoked_at.isnot(None)).order_by(SSHHost.id).all():
+    settled = utc_now() - timedelta(seconds=REVOKED_HOST_GRACE_SECONDS)
+    for host in SSHHost.query.filter(SSHHost.revoked_at.isnot(None), SSHHost.revoked_at <= settled
+                                     ).order_by(SSHHost.id).all():
         if host.ssh_ca_id not in live:
             live[host.ssh_ca_id] = {tuple((c.public_key or '').split()[:2]) for c in SSHCertificate.query.filter(
                 SSHCertificate.ssh_ca_id == host.ssh_ca_id, SSHCertificate.valid_to > utc_now(),

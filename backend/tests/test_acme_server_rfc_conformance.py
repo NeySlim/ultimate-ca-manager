@@ -137,6 +137,9 @@ class _FakeSock:
     def __exit__(self, *exc):
         return False
 
+    def settimeout(self, _timeout):
+        pass
+
 
 def _alpn_cert(expected_hash, san_names):
     key = ec.generate_private_key(ec.SECP256R1())

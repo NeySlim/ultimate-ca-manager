@@ -1433,7 +1433,7 @@ class RestoreCoreMixin:
                 existing.revoked_at = revoked_at
                 existing.revoked_by_user_id = revoked_by
                 existing.expires_at = expires_at
-                put_back('acme_eab_credentials', existing, held)
+                put_back('acme_eab_credentials', existing, held, plan)
             else:
                 new_eab = AcmeEabCredential(
                     kid=kid,

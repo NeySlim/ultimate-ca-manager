@@ -128,6 +128,30 @@ def test_a_failure_after_the_bundle_is_built_gives_the_approval_back(app, auth_c
             assert AuditLog.query.filter_by(action='key_recovery.recover_failed').count() == before + 1
 
 
+def _attempts(app, rid):
+    from models import AuditLog
+    with app.app_context():
+        rows = AuditLog.query.filter(AuditLog.resource_type == 'key_recovery', AuditLog.resource_id == str(rid),
+                                     AuditLog.action.in_(('key_recovery.recovered',
+                                                          'key_recovery.recover_failed')))
+        return [a.action for a in rows.order_by(AuditLog.id)]
+
+
+def test_each_download_is_audited_once_by_its_outcome(app, auth_client, create_cert, monkeypatch):
+    """A failed build is audited by its branch alone, not again on the way out; a success never as failed."""
+    rid = _approved(auth_client, create_cert(cn='claim-audit-once.example.test')['id'])
+
+    def broken(**kw):
+        raise ValueError('no bundle')
+    monkeypatch.setattr(key_recovery.pkcs12, 'serialize_key_and_certificates', broken)
+    assert _post(auth_client, f'/api/v2/key-recovery/{rid}/recover', PW).status_code == 500
+    monkeypatch.undo()
+    assert _attempts(app, rid) == ['key_recovery.recover_failed']
+    assert _post(auth_client, f'/api/v2/key-recovery/{rid}/recover', PW).status_code == 200
+    assert _attempts(app, rid) == ['key_recovery.recover_failed', 'key_recovery.recovered']
+    assert _status(app, rid) == 'recovered'
+
+
 def test_an_account_reusing_a_deleted_requesters_name_cannot_collect(app, auth_client, create_user, create_cert):
     create_user(username='kr_reused', role='operator', email='kr-first@test.local')
     first = _signed_in(app, 'kr_reused')
