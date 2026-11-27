@@ -1353,8 +1353,11 @@ class RestoreCoreMixin:
             target = existing
             held = held_here('acme_accounts', existing, getattr(self, '_merging', False))
             if existing:
-                existing.jwk = acme_data['jwk']
-                existing.jwk_thumbprint = jwk_thumbprint
+                # RFC 8555 §7.3.5: in a merge the account here is the truth on its key, so a key
+                # rolled over after the archive (often a compromised one) never authenticates again
+                if not getattr(self, '_merging', False):
+                    existing.jwk = acme_data['jwk']
+                    existing.jwk_thumbprint = jwk_thumbprint
                 existing.contact = acme_data.get('contact')
                 existing.status = acme_data.get('status', 'valid')
                 existing.terms_of_service_agreed = acme_data.get('terms_of_service_agreed', False)

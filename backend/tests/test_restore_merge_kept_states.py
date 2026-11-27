@@ -380,3 +380,19 @@ def test_an_archive_revoking_a_credential_used_here_keeps_its_use(installation):
                          ('status', 'used_at', 'used_by_account_id', 'revoked_at'))
     assert after == {'status': 'revoked', 'used_at': _WHEN, 'used_by_account_id': 'acct-here',
                      'revoked_at': datetime(2026, 7, 1, 12, 0, 0)}, after
+
+
+def test_a_merge_keeps_an_account_key_changed_here(installation):
+    """RFC 8555 §7.3.5: the account here is the truth on its key, an old archived one never comes back."""
+    from models.acme_models import AcmeAccount
+    row_id = _make_acme_account()
+    master, payload = _archive(('acme_accounts',))
+    row = db.session.get(AcmeAccount, row_id)
+    row.jwk, row.jwk_thumbprint = '{"kty":"OKP"}', uuid.uuid4().hex
+    db.session.commit()
+    _row, before = _state(AcmeAccount, row_id, ('jwk', 'jwk_thumbprint'))
+
+    _merge(master, payload)
+
+    _row, after = _state(AcmeAccount, row_id, ('jwk', 'jwk_thumbprint'))
+    assert after == before, (before, after)
