@@ -674,13 +674,47 @@ def decrypt_master_key_value(value: str, fmt: str) -> str:
 
 
 def count_master_key_values() -> Tuple[int, int]:
-    """Return (encrypted, unencrypted) counts of the values under the master key."""
+    """Return (encrypted, unencrypted) counts of the values under the master key.
+
+    Plain columns are counted in one UNION query on the base64 prefix every ENC: value starts
+    with; only wrapped properties and the SystemConfig secrets are read row by row.
+    """
+    import importlib
+    from sqlalchemy import case, select, union_all
+    from sqlalchemy.orm.attributes import InstrumentedAttribute
+    from models import db, SystemConfig
+
+    prefix = base64.b64encode(ENCRYPTED_MARKER).decode()[:5]
     encrypted = unencrypted = 0
-    for _, row, attribute, _ in master_key_values():
-        if key_encryption.is_encrypted(getattr(row, attribute)):
-            encrypted += 1
+    counts = []
+    for module, name, attribute, _ in MASTER_KEY_COLUMNS:
+        model = getattr(importlib.import_module(module), name)
+        column = getattr(model, attribute)
+        if isinstance(column, InstrumentedAttribute):
+            # substr, not LIKE: SQLite's LIKE ignores case
+            marked = db.func.substr(column, 1, len(prefix)) == prefix
+            counts.append(select(
+                db.func.coalesce(db.func.sum(case((marked, 1), else_=0)), 0),
+                db.func.coalesce(db.func.sum(case((marked, 0), else_=1)), 0),
+            ).where(column.isnot(None), column != ''))
         else:
-            unencrypted += 1
+            for row in model.query.all():
+                value = getattr(row, attribute)
+                if value:
+                    if key_encryption.is_encrypted(value):
+                        encrypted += 1
+                    else:
+                        unencrypted += 1
+    if counts:
+        for done, todo in db.session.execute(union_all(*counts)):
+            encrypted += int(done)
+            unencrypted += int(todo)
+    for row in SystemConfig.query.filter(SystemConfig.key.like('acme.%')).all():
+        if row.value and _is_master_key_config(row.key):
+            if key_encryption.is_encrypted(row.value):
+                encrypted += 1
+            else:
+                unencrypted += 1
     return encrypted, unencrypted
 
 
