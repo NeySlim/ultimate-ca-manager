@@ -182,7 +182,9 @@ def test_the_public_route_serves_a_stored_description_as_text(app, auth_client, 
     # A row written before the input check (or restored) may hold a line break
     with app.app_context():
         row = db.session.get(SSHCertificateAuthority, ca['id'])
-        row.descr = _trap(marker)
+        # Relative to the shell's working directory: the column holds 255 characters
+        row.descr = _trap('markers')
+        assert len(row.descr) <= 255
         db.session.commit()
     client = app.test_client()
     windows = client.get(f"/ssh/setup/{ca['refid']}?platform=windows")
