@@ -533,6 +533,27 @@ def test_requests_approved_here_at_one_instant_each_keep_their_own_row(installat
         (row_id, comments[row_id], 'approved', certificates[row_id]) for row_id in ids)
 
 
+
+def test_an_older_archive_naming_a_policy_without_its_identity_still_merges(installation):
+    """An archive older than the reference identities: its policy number alone stops nothing."""
+    from models.policy import ApprovalRequest
+    row_id = _make_approval_request()
+    comment = db.session.get(ApprovalRequest, row_id).requester_comment
+    master, payload = _archive(('approval_requests', 'users'))
+    payload = {name: copy.deepcopy(list(payload[name])) for name in ('approval_requests', 'users')}
+    for row in payload['approval_requests']:
+        if row.get('requester_comment') == comment:
+            row['policy_id'] = 987654
+            row.pop('policy_id_ref', None)
+    db.session.delete(db.session.get(ApprovalRequest, row_id))
+    db.session.commit()
+
+    _merge(master, payload)
+
+    db.session.expire_all()
+    back = ApprovalRequest.query.filter_by(requester_comment=comment).all()
+    assert [(r.status, r.policy_id) for r in back] == [('pending', None)]
+
 def test_a_merge_keeps_an_account_key_changed_here(installation):
     """RFC 8555 §7.3.5: the account here is the truth on its key, an old archived one never comes back."""
     from models.acme_models import AcmeAccount

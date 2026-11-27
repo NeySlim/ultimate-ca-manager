@@ -41,7 +41,7 @@ KEPT_STATES = {
     'approval_requests': (lambda row: row.status in ('approved', 'rejected', 'expired', 'cancelled'),
                           ('status', 'resolved_at', 'approvals', 'certificate_id', 'request_data'), {}),
     # Its delivery is recorded on its approval request (request_data), kept above
-    'scep_requests':(lambda row: row.status in ('approved', 'rejected'),
+    'scep_requests': (lambda row: row.status in ('approved', 'rejected'),
                       ('status', 'rejection_reason', 'approved_by', 'approved_at', 'cert_refid'), {}),
 }
 

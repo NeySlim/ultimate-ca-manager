@@ -633,13 +633,14 @@ class RestoreExtendedMixin:
             if request is None and certificate_id is None and plan.merging:
                 # Approved here since the archive: the request now names the certificate it issued.
                 # Same instant, type, policy and requester, and no row another archived row took
-                policy_id = _reference(where, 'approval_requests', ar_data, 'policy_id', plan,
-                                       optional=True)
+                # A policy the archive names without its identity (an older archive) filters nothing
+                policy_id = plan.resolve('approval_requests', ar_data, 'policy_id')
+                unknown_policy = policy_id is None and ar_data.get('policy_id') is not None
                 candidates = ApprovalRequest.query.filter(
                     ApprovalRequest.created_at == created_at, ApprovalRequest.status == 'approved',
                     ApprovalRequest.certificate_id.isnot(None),
                     ApprovalRequest.request_type == (ar_data.get('request_type') or 'certificate'),
-                    ApprovalRequest.policy_id.is_(None) if policy_id is None
+                    True if unknown_policy else ApprovalRequest.policy_id.is_(None) if policy_id is None
                     else ApprovalRequest.policy_id == policy_id,
                     ApprovalRequest.requester_id.is_(None) if requester_id is None
                     else ApprovalRequest.requester_id == requester_id,
