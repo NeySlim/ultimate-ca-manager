@@ -1576,3 +1576,12 @@ def no_serial_index(app):
             db.session.execute(text(purge))
             db.session.execute(text(create))
             db.session.commit()
+
+
+@pytest.fixture(autouse=True)
+def _hostname_lookup_cache_cleared():
+    """`hostname -f` is memoised per process: no test inherits another's lookup."""
+    from config import settings
+    settings._system_hostname_fqdn.cache_clear()
+    yield
+    settings._system_hostname_fqdn.cache_clear()

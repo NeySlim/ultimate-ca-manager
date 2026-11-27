@@ -2,6 +2,7 @@
 Ultimate Certificate Manager - Configuration Management
 Handles all application settings with web UI configuration support
 """
+import functools
 import logging
 import os
 import socket
@@ -103,6 +104,25 @@ def restart_ucm_service():
         return False, f"Failed to create restart signal: {str(e)}"
 
 
+@functools.lru_cache(maxsize=None)
+def _system_hostname_fqdn():
+    """Validated `hostname -f`, or None; failures cached too (one subprocess per process)."""
+    try:
+        result = subprocess.run(
+            ['hostname', '-f'],
+            capture_output=True,
+            text=True,
+            timeout=2
+        )
+        if result.returncode == 0:
+            fqdn = result.stdout.strip()
+            if fqdn and '.' in fqdn and fqdn not in ['localhost', 'localhost.localdomain']:
+                return fqdn
+    except (subprocess.SubprocessError, FileNotFoundError, subprocess.TimeoutExpired):
+        pass
+    return None
+
+
 def get_system_fqdn():
     """
     Get system FQDN based on environment:
@@ -114,22 +134,11 @@ def get_system_fqdn():
     if is_docker():
         return os.getenv('UCM_FQDN')
     
-    # Native installation: Try hostname -f first
-    try:
-        result = subprocess.run(
-            ['hostname', '-f'],
-            capture_output=True,
-            text=True,
-            timeout=2
-        )
-        if result.returncode == 0:
-            fqdn = result.stdout.strip()
-            # Validate it's not just a hostname (has a dot)
-            if fqdn and '.' in fqdn and fqdn not in ['localhost', 'localhost.localdomain']:
-                return fqdn
-    except (subprocess.SubprocessError, FileNotFoundError, subprocess.TimeoutExpired):
-        pass
-    
+    # Native installation: hostname -f first (resolved once per process)
+    fqdn = _system_hostname_fqdn()
+    if fqdn:
+        return fqdn
+
     # Fallback: Check environment variable
     env_fqdn = os.getenv('FQDN')
     if env_fqdn and env_fqdn not in ['localhost', 'ucm.local', 'ucm.example.com']:
