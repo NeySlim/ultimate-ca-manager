@@ -34,6 +34,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Security
 
+- API keys: a key could rename, revoke and then delete any other key of its owner, a wider one included; it now manages only itself and the keys whose every scope it holds (403 otherwise), as regenerating already required.
 - SSH CAs: a description holding `$(...)`, backquotes or a line break ran as a command on every server that installed the setup script (sh or PowerShell); the scripts now print it as a quoted literal, and a description with a control character or a line break is refused with 400.
 - Settings, SMTP OAuth: the console accepted an authorization result posted by any window, the provider's page included; it now takes it only from its own popup on the console's origin.
 - Operations, OPNsense import: the API key and secret were kept in clear in the browser's session storage after a connection test and survived a sign-out; only the host, port and TLS check stay there now, the credentials are held in memory until sign-out.
