@@ -162,7 +162,7 @@ Database migrations run automatically at startup.
 
 ### Custom Command DNS providers are written by administrators only
 
-Creating a DNS provider of type `custom_command`, or changing one (`PATCH /api/v2/dns-providers/{id}`), now requires the `write:deploy` permission, which only administrators hold. An operator, a custom role or an API key holding `write:acme` without it receives `403`; such keys must be replaced by an administrator's key that carries `write:deploy`. Existing providers keep working for domain tests, provider tests, orders and renewals, and every other provider type keeps its permissions.
+Creating a DNS provider of type `custom_command`, or changing one (`PATCH /api/v2/dns-providers/{id}`), now requires the `write:deploy` permission, which only administrators hold. An operator, a custom role or an API key holding `write:acme` without it receives `403`; such keys must be replaced by an administrator's key that carries `write:deploy`. Existing providers keep working for domain tests, provider tests, orders and renewals, and every other provider type keeps its permissions. Review the Custom Command providers already in place, and the `dns_provider_create` and `dns_provider_update` audit entries made by non-administrators: one created before the upgrade by an operator or an API key still runs.
 
 ### Export requests with a password in the wrong place are refused
 
