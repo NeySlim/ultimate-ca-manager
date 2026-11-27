@@ -63,13 +63,10 @@ for (const width of [1280, 1920]) {
       await expect(dialog, path).toBeVisible()
       // the folded parts hold helps too
       const folded = dialog.locator('.advanced-toggle[aria-expanded=false]')
-      // A toggle is counted again only once its click has unfolded it
-      while (await folded.count()) {
-        const toggle = await folded.first().elementHandle()
-        if (!toggle) continue
-        await toggle.click()
-        await expect.poll(() => toggle.getAttribute('aria-expanded')).toBe('true')
-      }
+      // The dialog redraws while its parts unfold: a click that misses is played again
+      await expect(async () => {
+        while (await folded.count()) await folded.first().click({ timeout: 2_000 })
+      }).toPass({ timeout: 30_000 })
       const m = await dialog.evaluate((d) => {
         const over: string[] = []
         let count = 0, widest = 0
