@@ -103,7 +103,7 @@ def _apply_or_leave_out(section_name, section, instance, row, columns, attribute
     held = None if new else held_here(section_name, instance, plan.merging)
     try:
         _apply_row(section_name, section, instance, row, columns, attribute_of, plan, new)
-        put_back(section_name, instance, held)
+        put_back(section_name, instance, held, plan)
     except UnplaceableLegacyRow as left_out:
         if new and state.persistent:
             db.session.delete(instance)
@@ -758,12 +758,15 @@ def relink_references(backup_data: Dict[str, Any], plan: RestorePlan) -> Dict[st
             instance = db.session.get(model, target_id)
             if instance is None:
                 continue
+            kept = plan.kept_columns(section_name, instance)
             for column in section.references:
                 if column not in row or (f'{column}{REFERENCE_SUFFIX}' not in row
                                          and row.get(column) is not None):
                     continue      # no identity to resolve: the first pass decided
-                resolved = plan.resolve(section_name, row, column)
                 attribute = attribute_of.get(column, column)
+                if column in kept or attribute in kept:
+                    continue      # part of a final state a merge keeps here (kept_states)
+                resolved = plan.resolve(section_name, row, column)
                 if resolved is None and column in columns and not columns[column].nullable:
                     continue      # kept, as `_unplaceable_reference` keeps it
                 if getattr(instance, attribute, None) != resolved:

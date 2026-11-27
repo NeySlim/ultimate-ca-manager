@@ -34,7 +34,7 @@ KEPT_STATES = {
     'acme_dns_update_keys': (lambda row: row.status == 'revoked', ('status', 'revoked_at'), {}),
     # A recovered key is handed out once: an 'approved' archive row would hand it out again
     'key_recovery_requests': (lambda row: row.status in ('recovered', 'rejected', 'cancelled'),
-                              ('status', 'decided_by', 'decided_at', 'decision_note',
+                              ('status', 'decided_by', 'decided_by_id', 'decided_at', 'decision_note',
                                'recovered_by', 'recovered_at'), {}),
     # A request refused, expired or cancelled here never goes back to pending (approved is not kept)
     'approval_requests': (lambda row: row.status in ('rejected', 'expired', 'cancelled'),
@@ -55,10 +55,13 @@ def held_here(section_name: str, row: Any, merging: bool) -> Optional[Dict[str, 
     return {**{column: getattr(row, column) for column in columns}, **implied}
 
 
-def put_back(section_name: str, row: Any, held: Optional[Dict[str, Any]]) -> None:
-    """Write the state held here back, but for what an outranking archive state replaces."""
+def put_back(section_name: str, row: Any, held: Optional[Dict[str, Any]], plan=None) -> None:
+    """Write the state held here back, but for what an outranking archive state replaces.
+    *plan* records the columns written: relink_references leaves them as they are."""
     rule = _OUTRANKED.get(section_name)
     if held and rule is not None and rule[0](held.get('status'), getattr(row, 'status', None)):
         held = {column: held[column] for column in rule[1]}
     for column, value in (held or {}).items():
         setattr(row, column, value)
+    if held and plan is not None:
+        plan.keep(section_name, row, held)

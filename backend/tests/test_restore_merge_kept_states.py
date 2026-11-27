@@ -154,7 +154,8 @@ def _make_eab():
 
 
 def _revoke_eab(row):
-    row.status, row.revoked_at = 'revoked', _WHEN
+    # The revoker is a reference: a second pass over references must not drop it
+    row.status, row.revoked_at, row.revoked_by_user_id = 'revoked', _WHEN, _user().id
 
 
 def _use_eab(row):
@@ -259,7 +260,7 @@ CASES = {
         {'status': 'deactivated'}),
     'acme_eab_credentials': (
         'models.acme_models:AcmeEabCredential', ('acme_eab_credentials',), _make_eab,
-        ('row', _revoke_eab), ('status', 'revoked_at'), lambda row: row.status == 'revoked',
+        ('row', _revoke_eab), ('status', 'revoked_at', 'revoked_by_user_id'), lambda row: row.status == 'revoked',
         {'status': 'revoked', 'revoked_at': '2026-06-01T12:00:00'}),
     # Single-use: a credential consumed here never registers a second account
     'acme_eab_credentials:used': (
@@ -275,7 +276,8 @@ CASES = {
         {'status': 'recovered', 'recovered_by': 'v', 'recovered_at': '2026-06-01T12:00:00'}),
     'key_recovery_requests:cancelled': (
         'models.key_recovery:KeyRecoveryRequest', ('key_recovery_requests',), _make_key_recovery_request,
-        ('row', _set(status='cancelled', decision_note='no')), ('status', 'decision_note'),
+        ('row', lambda row: _set(status='cancelled', decision_note='no', decided_by_id=_user().id)(row)),
+        ('status', 'decision_note', 'decided_by_id'),
         lambda row: row.status == 'cancelled', {'status': 'cancelled', 'decision_note': 'no'}),
     # A request refused or closed here is never pending again, to be approved after all
     'approval_requests': (

@@ -75,6 +75,8 @@ class RestorePlan:
         # carrying them), else the number of those written under ids of this installation
         self.keep_audit_ids = False
         self.audit_new = 0
+        # Columns of a final state kept here (kept_states.put_back), per section and row identity
+        self.kept: Dict[Tuple[str, Tuple], frozenset] = {}
 
     # -- building ---------------------------------------------------------
 
@@ -326,6 +328,14 @@ class RestorePlan:
             claims.append(id(row))
         position = claims.index(id(row))
         return ids[position] if position < len(ids) else None
+
+    def keep(self, section_name: str, instance, columns) -> None:
+        identity = sa_inspect(instance).identity
+        if identity is not None:
+            self.kept[(section_name, identity)] = frozenset(columns)
+
+    def kept_columns(self, section_name: str, instance) -> frozenset:
+        return self.kept.get((section_name, sa_inspect(instance).identity), frozenset())
 
     def place(self, section_name: str, row: Dict[str, Any], instance) -> None:
         """Record the row here an archived row was written to: a later pass finds that one."""
