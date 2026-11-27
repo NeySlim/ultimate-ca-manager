@@ -988,6 +988,8 @@ class HsmService:
                     db.session.rollback()
                     logger.warning("Failed to update the SoftHSM-Default provider: %s", e)
                     return
+                if takeover:
+                    HsmService._drop_kept_softhsm_pin()
                 if repaired:
                     logger.info("Repaired PKCS#11 config keys for SoftHSM-Default provider")
                 if takeover:
@@ -1036,3 +1038,13 @@ class HsmService:
         except Exception as e:
             db.session.rollback()
             logger.warning(f"Failed to auto-register SoftHSM provider: {e}")
+            return
+        HsmService._drop_kept_softhsm_pin()
+
+    @staticmethod
+    def _drop_kept_softhsm_pin():
+        """The image entrypoint keeps the new token's PIN on disk until a committed row holds it."""
+        try:
+            (Path(Config.DATA_DIR) / 'softhsm' / '.default-pin').unlink(missing_ok=True)
+        except OSError as e:
+            logger.warning("SoftHSM-Default registered, but its kept PIN file could not be removed: %s", e)

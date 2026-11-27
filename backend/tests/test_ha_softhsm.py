@@ -365,18 +365,27 @@ def _softhsm_block():
     return '\n'.join(lines[start:end + 1])
 
 
-def _run_softhsm_block(tmp_path, env):
-    # Fake softhsm2-util and openssl first in PATH: no slot exists, every call is logged
+def _run_softhsm_block(tmp_path, env, slots='', init_rc=0):
+    # Fake softhsm2-util and openssl first in PATH: `slots` is what --show-slots prints, every
+    # call is logged with whether the PIN file exists then; DATA_PATH is always the test's own
     fake = tmp_path / 'bin'
     fake.mkdir()
     calls = tmp_path / 'calls'
-    (fake / 'softhsm2-util').write_text(f'#!/bin/sh\necho "$@" >> {calls}\nexit 0\n')
+    data = tmp_path / 'data'
+    (data / 'softhsm' / 'tokens').mkdir(parents=True, exist_ok=True)
+    pin_file = data / 'softhsm' / '.default-pin'
+    (tmp_path / 'slots').write_text(slots)
+    (fake / 'softhsm2-util').write_text(
+        f'#!/bin/sh\necho "$@" "pinfile=$(cat {pin_file} 2>/dev/null)" >> {calls}\n'
+        f'case "$1" in --show-slots) cat {tmp_path / "slots"}; exit 0 ;; esac\nexit {init_rc}\n')
     (fake / 'openssl').write_text('#!/bin/sh\necho 0123456789abcdef\n')
     for tool in fake.iterdir():
         tool.chmod(0o755)
     script = tmp_path / 'block.sh'
-    script.write_text(f'. {HELPER}\n{_softhsm_block()}\necho "PIN=${{HSM_DEFAULT_PIN-unset}}"\n')
-    run = subprocess.run(['bash', str(script)], env={'PATH': f'{fake}:/usr/bin:/bin', **env},
+    script.write_text(f'. {HELPER}\n{_softhsm_block()}\necho "PIN=${{HSM_DEFAULT_PIN-unset}}"\n'
+                      'echo "CREATED=${HSM_TOKEN_CREATED-unset}"\n')
+    run = subprocess.run(['bash', str(script)],
+                         env={'PATH': f'{fake}:/usr/bin:/bin', 'DATA_PATH': str(data), **env},
                          capture_output=True, text=True, cwd=tmp_path)
     assert run.returncode == 0, run.stderr
     return run.stdout, calls.read_text() if calls.exists() else ''
@@ -401,3 +410,39 @@ def test_the_entrypoint_leaves_the_token_when_auto_init_is_off(tmp_path):
     out, calls = _run_softhsm_block(tmp_path, {'HSM_AUTO_INIT': 'false'})
     assert '--init-token' not in calls
     assert 'HSM_AUTO_INIT is off' in out and 'PIN=unset' in out
+
+
+DEFAULT_SLOT = 'Slot 0\n    Token info:\n        Label:            UCM-Default\n'
+
+
+def test_the_entrypoint_keeps_the_pin_before_creating_the_token(tmp_path):
+    # The PIN reaches the disk before the token exists: a start that dies after it loses nothing
+    out, calls = _run_softhsm_block(tmp_path, {})
+    init = next(line for line in calls.splitlines() if line.startswith('--init-token'))
+    assert init.endswith('pinfile=0123456789abcdef')
+    pin_file = tmp_path / 'data' / 'softhsm' / '.default-pin'
+    assert pin_file.read_text().strip() == '0123456789abcdef'
+    assert pin_file.stat().st_mode & 0o777 == 0o600
+    assert 'PIN=0123456789abcdef' in out and 'CREATED=1' in out
+
+
+def test_a_restart_hands_the_kept_pin_to_the_application_again(tmp_path):
+    # The first start died before the application registered the token it created
+    pin_file = tmp_path / 'data' / 'softhsm' / '.default-pin'
+    pin_file.parent.mkdir(parents=True)
+    pin_file.write_text('fedcba9876543210\n')
+    out, calls = _run_softhsm_block(tmp_path, {}, slots=DEFAULT_SLOT)
+    assert '--init-token' not in calls
+    assert 'PIN=fedcba9876543210' in out and 'CREATED=1' in out
+
+
+def test_a_registered_token_hands_no_pin_neg(tmp_path):
+    out, calls = _run_softhsm_block(tmp_path, {}, slots=DEFAULT_SLOT)
+    assert '--init-token' not in calls
+    assert 'PIN=unset' in out and 'CREATED=unset' in out
+
+
+def test_a_failed_token_creation_keeps_no_pin_neg(tmp_path):
+    out, _calls = _run_softhsm_block(tmp_path, {}, init_rc=1)
+    assert not (tmp_path / 'data' / 'softhsm' / '.default-pin').exists()
+    assert 'PIN=unset' in out

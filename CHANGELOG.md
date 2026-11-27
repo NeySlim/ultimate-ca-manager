@@ -64,6 +64,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Fixed
 
+- Docker: when the first start stopped before UCM registered the SoftHSM token it had just created (database not ready, `docker stop`), the token's PIN was lost and `SoftHSM-Default` was never created; the PIN is now kept in the data volume until the provider holds it.
 - Helm chart: an HA render without cluster access (`helm template`, GitOps) drew a new `UCM_SECRET_KEY` at each render without restarting the pods, so pods started from two renders had different session keys; it now refuses to render until `secrets.secretKey` is set.
 - Docker: without `UCM_SECRET_KEY` the image generated a new session key at each start, so a restart signed every session out and broke what was signed with the key; the key generated at the first start is now kept in `/etc/ucm/secret.key` and used again (#457).
 - Dialogs: a message raised while a dialog was open was drawn under its blurred backdrop, unreadable and its buttons out of reach; the error or warning that answers a form dialog now shows in the dialog above its buttons, and any other message is drawn above the dialog; on a phone a message takes the screen's width instead of half of it (#456).

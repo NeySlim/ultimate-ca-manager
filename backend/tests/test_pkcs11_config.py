@@ -234,6 +234,47 @@ class TestAutoRegisterSofthsm:
             assert row.status == 'unknown'
             assert 'carried over' in caplog.text
 
+    @staticmethod
+    def _pin_file():
+        from config.settings import Config
+        path = Config.DATA_DIR / 'softhsm' / '.default-pin'
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text('kept-pin\n')
+        return path
+
+    def test_the_kept_pin_is_removed_once_the_row_is_registered(self, app):
+        with app.app_context():
+            from models import db
+            HsmProvider.query.filter_by(name='SoftHSM-Default').delete()
+            db.session.commit()
+            pin_file = self._pin_file()
+            with patch('utils.hsm_check._find_softhsm', return_value='/tmp/libsofthsm-test.so'):
+                self._run({'HSM_DEFAULT_PIN': 'kept-pin', 'HSM_TOKEN_CREATED': '1'})
+            assert HsmProvider.query.filter_by(name='SoftHSM-Default').one().get_config()['user_pin'] == 'kept-pin'
+            assert not pin_file.exists()
+
+    def test_the_kept_pin_is_removed_once_the_row_took_the_token_over(self, app):
+        with app.app_context():
+            self._seed_row({'token_label': 'UCM-Default', 'user_pin': 'stale-pin'})
+            pin_file = self._pin_file()
+            self._run({'HSM_DEFAULT_PIN': 'kept-pin', 'HSM_TOKEN_CREATED': '1'})
+            assert not pin_file.exists()
+
+    def test_the_kept_pin_stays_while_no_row_holds_it_neg(self, app):
+        # No SoftHSM library: nothing registered, so the next start hands the PIN again
+        with app.app_context():
+            from models import db
+            HsmProvider.query.filter_by(name='SoftHSM-Default').delete()
+            db.session.commit()
+            pin_file = self._pin_file()
+            try:
+                with patch('utils.hsm_check._find_softhsm', return_value=None):
+                    self._run({'HSM_DEFAULT_PIN': 'kept-pin', 'HSM_TOKEN_CREATED': '1'})
+                assert HsmProvider.query.filter_by(name='SoftHSM-Default').first() is None
+                assert pin_file.exists()
+            finally:
+                pin_file.unlink(missing_ok=True)
+
     @pytest.mark.parametrize('env, config', [
         ({'HSM_DEFAULT_PIN': 'env-pin'}, {'token_label': 'UCM-Default'}),
         ({'HSM_DEFAULT_PIN': 'env-pin', 'HSM_TOKEN_CREATED': '1'}, {'token_label': 'MyToken'}),
