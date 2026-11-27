@@ -25,6 +25,9 @@ function FormDialog() {
     <AtelierDialog title="Create Template" onClose={() => setOpen(false)}>
       <form onSubmit={(e) => { e.preventDefault(); onSend() }}>
         <input aria-label="Template Name" />
+        <label htmlFor="tpl-notes">Notes</label>
+        <textarea id="tpl-notes" />
+        <label><input type="checkbox" /> Default template</label>
         <div className="modal-actions">
           <button type="button" onClick={() => setOpen(false)}>Cancel</button>
           <button type="submit" className="btn primary">Create</button>
@@ -234,15 +237,33 @@ describe('pointing in the dialog while its sending waits', () => {
     expect(within(dialog).getByRole('alert')).toHaveTextContent('Saving failed.')
   })
 
-  it('on a control ends the sending', async () => {
+  it('on a field or a label keeps the answer for the dialog: only typing in it is a use', async () => {
     mount(<FormDialog />)
     const dialog = await screen.findByRole('dialog')
     onSend = waitingSend()
     await send(dialog)
-    await act(async () => { fireEvent.pointerDown(within(dialog).getByLabelText('Template Name')) })
+    await act(async () => {
+      fireEvent.pointerDown(within(dialog).getByLabelText('Template Name'))
+      fireEvent.pointerDown(within(dialog).getByLabelText('Notes'))
+      fireEvent.pointerDown(within(dialog).getByText('Notes'))
+      fireEvent.pointerDown(within(dialog).getByText('Default template'))
+    })
     await wait(400)
-    expect(within(dialog).queryByRole('alert')).toBeNull()
-    expect(line()).toHaveTextContent('Saving failed.')
+    expect(within(dialog).getByRole('alert')).toHaveTextContent('Saving failed.')
+  })
+
+  it('on a control that acts (a button, a checkbox) ends the sending', async () => {
+    for (const target of [(d) => within(d).getByRole('button', { name: 'Cancel' }), (d) => within(d).getByRole('checkbox')]) {
+      const view = mount(<FormDialog />)
+      const dialog = await screen.findByRole('dialog')
+      onSend = waitingSend()
+      await send(dialog)
+      await act(async () => { fireEvent.pointerDown(target(dialog)) })
+      await wait(400)
+      expect(within(dialog).queryByRole('alert')).toBeNull()
+      expect(line()).toHaveTextContent('Saving failed.')
+      view.unmount()
+    }
   })
 })
 
