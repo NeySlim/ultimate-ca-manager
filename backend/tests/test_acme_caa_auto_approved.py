@@ -34,3 +34,31 @@ def test_auto_approved_authorizations_name_no_validation_method(app, monkeypatch
 
         _, methods = service._caa_request_context(order)
         assert methods == {'www.caa-auto.example': None, '*.caa-auto.example': None}
+
+
+def test_auto_approved_pre_authorization_reused_by_an_order_names_no_method(app, monkeypatch):
+    # newAuthz (RFC 8555 §7.4.1) must not create a valid challenge either:
+    # an order reusing it would otherwise claim dns-01 for a wildcard.
+    from models.acme_models import AcmeAccount
+    from services.acme.acme_service import AcmeService
+
+    with app.app_context():
+        account = AcmeAccount.query.filter_by(account_id='acct-caa-auto-preauth').first()
+        if account is None:
+            account = AcmeAccount(account_id='acct-caa-auto-preauth', jwk='{}',
+                                  jwk_thumbprint='caa-auto-preauth', status='valid', contact='[]')
+            db.session.add(account)
+            db.session.commit()
+        service = AcmeService(base_url='http://localhost')
+        monkeypatch.setattr(type(service), '_is_domain_auto_approved',
+                            lambda self, domain: True, raising=False)
+        pre = service.create_pre_authorization(
+            account.account_id, {'type': 'dns', 'value': '*.caa-preauth.example'})
+        assert pre.status == 'valid'
+        assert [c.type for c in pre.challenges] == []
+
+        order = service.create_order(account.account_id, [
+            {'type': 'dns', 'value': '*.caa-preauth.example'},
+        ])
+        _, methods = service._caa_request_context(order)
+        assert methods == {'*.caa-preauth.example': None}

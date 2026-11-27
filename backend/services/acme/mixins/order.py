@@ -312,9 +312,9 @@ class OrderMixin:
         db.session.add(auth)
         db.session.flush()
         
-        if skip_challenges:
-            self._create_challenges(auth, status='valid', validated=utc_now())
-        else:
+        # Auto-approved: no challenge was performed, so none is listed (RFC 8555
+        # §7.1.4) and an order reusing it claims no CAA validation method (RFC 8657 §4).
+        if not skip_challenges:
             self._create_challenges(auth, status="pending")
         
         try:
