@@ -755,7 +755,7 @@ export default function SettingsPage() {
       showSuccess(t('sso.deleteSuccess'))
       loadSsoProviders()
     } catch (error) {
-      showError(t('sso.deleteFailed'))
+      showError(error?.message || t('sso.deleteFailed'))
     } finally {
       setSsoConfirmDelete(null)
     }
@@ -767,7 +767,7 @@ export default function SettingsPage() {
       showSuccess(t('sso.toggleSuccess', { action: provider.enabled ? t('common.disabled').toLowerCase() : t('common.enabled').toLowerCase() }))
       loadSsoProviders()
     } catch (error) {
-      showError(t('sso.toggleFailed'))
+      showError(error?.message || t('sso.toggleFailed'))
     }
   }
 
@@ -957,7 +957,7 @@ export default function SettingsPage() {
       showSuccess(t('webhooks.deleteSuccess'))
       loadWebhooks()
     } catch (error) {
-      showError(t('webhooks.deleteFailed'))
+      showError(error?.message || t('webhooks.deleteFailed'))
     } finally {
       setWebhookConfirmDelete(null)
     }
@@ -969,7 +969,7 @@ export default function SettingsPage() {
       showSuccess(t('webhooks.toggleSuccess', { action: webhook.enabled ? t('common.disabled').toLowerCase() : t('common.enabled').toLowerCase() }))
       loadWebhooks()
     } catch (error) {
-      showError(t('webhooks.toggleFailed'))
+      showError(error?.message || t('webhooks.toggleFailed'))
     }
   }
 

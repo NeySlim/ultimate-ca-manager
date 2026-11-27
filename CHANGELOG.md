@@ -108,6 +108,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 - Dialogs: only Create Template kept its buttons in view at the foot of a long form; every form dialog (Issue a certificate, Create a CA, the policies and the others) now does, so its main button is never cut by the dialog's edge.
 - SSH Hosts: the New enrollment token dialog could be closed, or submitted a second time, while its token was being created, which lost the token shown only once; it now stays open until the token is shown.
 - Certificates: exporting every result as PEM stopped at 10,000 certificates without a word; it now says that the export was cut, as the CSV and JSON exports do.
+- Settings: a refused deletion or switch of an SSO provider or a webhook showed only "Failed to delete"; it now gives the server's reason, such as a busy database to retry or a missing permission.
 
 ## [3.0] - 2026-11-25
 
