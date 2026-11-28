@@ -36,7 +36,7 @@ export default function AboutSection() {
   useEffect(() => {
     const fetchInfo = async () => {
       try {
-        const response = await systemService.getServiceStatus()
+        const response = await systemService.getServiceStatus({ reuse: true })
         setInfo(response.data)
       } catch {
         setInfo(null)

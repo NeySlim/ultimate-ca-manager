@@ -36,7 +36,7 @@ export default function CompliancePreflightPanel() {
   useEffect(() => {
     let cancelled = false
     Promise.resolve()
-      .then(() => settingsService.getAll())
+      .then(() => settingsService.getAll({ reuse: true }))
       .then((res) => {
         const name = (extractData(res) || {}).compliance_profile_default
         if (!cancelled && COMPLIANCE_PROFILE_NAMES.includes(name)) setDefaultProfile(name)

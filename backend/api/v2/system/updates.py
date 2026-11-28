@@ -44,13 +44,14 @@ def _with_update_state(data):
 def check_updates():
     """Check for available updates"""
     try:
-        from services.updates import check_for_updates
+        from services.updates import UI_CHECK_MAX_AGE, check_for_updates
 
         include_prereleases = request.args.get('include_prereleases', 'false').lower() == 'true'
         include_dev = request.args.get('include_dev', 'false').lower() == 'true'
         force = request.args.get('force', 'false').lower() == 'true'
         result = _with_update_state(
-            check_for_updates(include_prereleases=include_prereleases, include_dev=include_dev, force=force))
+            check_for_updates(include_prereleases=include_prereleases, include_dev=include_dev, force=force,
+                              max_age=UI_CHECK_MAX_AGE))
 
         return success_response(data=result)
     except Exception as e:

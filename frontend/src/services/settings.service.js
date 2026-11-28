@@ -2,11 +2,13 @@
  * Settings Service
  */
 import { apiClient, buildQueryString } from './apiClient'
+import { OPENING_REUSE_MS, sharedRequest } from '../lib/sharedRequest'
 
 export const settingsService = {
-  async getAll() {
-    // Get all settings by fetching general settings
-    return apiClient.get('/settings/general')
+  // `reuse`: a panel opening may take the settings the page just read
+  async getAll({ reuse = false } = {}) {
+    return sharedRequest('settings/general', () => apiClient.get('/settings/general'),
+      { reuseMs: reuse ? OPENING_REUSE_MS : 0 })
   },
 
   async updateBulk(settings) {

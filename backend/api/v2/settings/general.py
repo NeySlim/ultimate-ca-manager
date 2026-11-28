@@ -94,6 +94,27 @@ _ADMIN_ONLY_SETTINGS = frozenset([
 @require_auth(['read:settings'])
 def get_general_settings():
     """Get general settings from database"""
+    from utils.config_snapshot import config_snapshot
+    with config_snapshot(_GENERAL_READ_KEYS):
+        return _general_settings_response()
+
+
+# Every SystemConfig key the screen reads, loaded together in one query
+_GENERAL_READ_KEYS = (
+    'system_name', 'timezone', 'auto_backup_enabled', 'backup_frequency', 'backup_retention_days',
+    'backup_max_total_mb', 'backup_kdf', RetentionPolicy.CONFIG_KEY, 'backup_password', 'metrics_token',
+    'session_timeout', 'session_max_lifetime', 'max_login_attempts', 'lockout_duration',
+    'protocol_base_url', 'http_protocol_port', 'base_url', 'acme_public_vhost', 'acme_public_port',
+    'acme_public_tls_cert_id', 'date_format', 'show_time', 'min_password_length', 'max_password_length',
+    'password_require_uppercase', 'password_require_lowercase', 'password_require_numbers',
+    'password_require_special', 'enforce_2fa', 'hsts_enabled', 'hsts_include_subdomains', 'hsts_max_age',
+    'key_recovery_dual_control', 'ocsp_response_validity_hours', 'ocsp_responder_auto_renew',
+    'ocsp_responder_renew_days', 'crl_auto_delete_expired_revoked', 'crl_auto_purge_stale_serials',
+    compliance_profiles.DEFAULT_SETTING,
+)
+
+
+def _general_settings_response():
     from protocol_http_server import get_http_protocol_port
     from utils.public_endpoints import env_locked_fields
     env_locked = env_locked_fields()

@@ -154,3 +154,5 @@ tests/test_ssh_krl_public.py
 tests/test_ssh_hosts*.py
 tests/test_key_recovery*.py
 tests/test_query_budget.py
+tests/test_master_key_count_queries.py
+tests/test_settings_query_budget.py

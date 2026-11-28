@@ -3901,7 +3901,9 @@ POST /api/v2/system/alerts/expiry/check
 # Check for updates (within the installed major version; the highest final release of the
 # next major version (installed + 1) is reported apart in major_upgrade: {version, published_at,
 # release_notes, html_url, download_url, package_name, checksum_url, assets}, null when
-# there is none, never a release candidate)
+# there is none, never a release candidate). The answer is the last one this node got from
+# GitHub, up to 6 hours old, and carries checked_at (UTC, when GitHub was asked); a failed
+# check (error) is kept 15 minutes. force=true always asks GitHub.
 GET /api/v2/system/updates/check
 
 # Upgrade to the next major version reported by the check (502 with the message of a

@@ -118,8 +118,8 @@ def profile_policy(name):
 
 def default_profile():
     """The profile new CAs receive when the request names none (None when unset)."""
-    from models import SystemConfig
-    row = SystemConfig.query.filter_by(key=DEFAULT_SETTING).first()
+    from utils.config_snapshot import config_row
+    row = config_row(DEFAULT_SETTING)
     value = (row.value or '').strip().lower() if row else ''
     return value if is_valid(value) else None
 

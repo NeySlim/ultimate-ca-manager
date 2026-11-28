@@ -2,6 +2,7 @@
  * System Service
  */
 import { apiClient, buildQueryString } from './apiClient'
+import { OPENING_REUSE_MS, sharedRequest } from '../lib/sharedRequest'
 
 export const systemService = {
   // Version/Updates
@@ -101,8 +102,10 @@ export const systemService = {
   },
 
   // Service Management
-  async getServiceStatus() {
-    return apiClient.get('/system/service/status')
+  // `reuse`: a screen opening may take the answer another one just got (Settings sections)
+  async getServiceStatus({ reuse = false } = {}) {
+    return sharedRequest('system/service/status', () => apiClient.get('/system/service/status'),
+      { reuseMs: reuse ? OPENING_REUSE_MS : 0 })
   },
 
   async getFipsPreflight() {

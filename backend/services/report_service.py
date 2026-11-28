@@ -510,9 +510,9 @@ Ultimate Certificate Manager
 
 def schedulable_reports() -> list:
     """Schedule keys: every data report, then 'pdf_<template>' (and the legacy 'executive_pdf')."""
-    from services.pdf_report_service import PDFReportService
+    from services.reporting.templates import TEMPLATES
     return (list(ReportService.REPORT_TYPES)
-            + [f'pdf_{t}' for t in PDFReportService.TEMPLATES]
+            + [f'pdf_{t}' for t in TEMPLATES]
             + ['executive_pdf'])
 
 

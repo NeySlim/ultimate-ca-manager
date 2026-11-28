@@ -54,8 +54,8 @@ class RetentionPolicy:
     @classmethod
     def get_retention_days(cls) -> int:
         """Configured retention in days, 0 when logs are kept forever."""
-        from models import SystemConfig
-        row = SystemConfig.query.filter_by(key=cls.CONFIG_KEY).first()
+        from utils.config_snapshot import config_row
+        row = config_row(cls.CONFIG_KEY)
         try:
             return cls.validate_days(row.value) if row and row.value else 0
         except RetentionSettingError:

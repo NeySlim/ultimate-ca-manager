@@ -234,8 +234,8 @@ def effective(key: str):
     """
     setting = SETTINGS[key]
     try:
-        from models import SystemConfig
-        row = SystemConfig.query.filter_by(key=key).first()
+        from utils.config_snapshot import config_row
+        row = config_row(key)
     except Exception as exc:                       # no table yet, no app, ...
         logger.debug('settings registry could not read %s: %s', key, exc)
         return setting.fallback()

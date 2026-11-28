@@ -27,10 +27,10 @@ def _get_lockout_settings():
     Returns:
         tuple: (max_attempts, lockout_seconds)
     """
-    from models import SystemConfig
+    from utils.config_snapshot import config_row
     try:
-        max_cfg = SystemConfig.query.filter_by(key='max_login_attempts').first()
-        dur_cfg = SystemConfig.query.filter_by(key='lockout_duration').first()
+        max_cfg = config_row('max_login_attempts')
+        dur_cfg = config_row('lockout_duration')
         max_attempts = int(max_cfg.value) if max_cfg and max_cfg.value else 5
         lockout_seconds = int(dur_cfg.value) if dur_cfg and dur_cfg.value else 900
     except Exception:

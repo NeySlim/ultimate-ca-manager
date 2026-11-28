@@ -14,7 +14,8 @@ bp = Blueprint('settings_v2', __name__)
 
 def get_config(key, default=None):
     """Get config value from database"""
-    config = SystemConfig.query.filter_by(key=key).first()
+    from utils.config_snapshot import config_row
+    config = config_row(key)
     return config.value if config else default
 
 
