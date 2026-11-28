@@ -1,6 +1,6 @@
 """A static file answers without the session (invariant I12), on each session store.
 
-A file the build ships (hashed asset, favicon, manifest, font) is cacheable by anyone: its
+A file the build ships (hashed asset, favicon, font) is cacheable by anyone: its
 answer never reads or writes the session store, never carries Set-Cookie nor Vary: Cookie,
 and leaves the signed-in account's session as it was. index.html, the guide and the API keep
 theirs, refreshed on each request; the security headers and the admin allowlist still apply.
@@ -201,8 +201,32 @@ def test_a_file_request_without_a_session_creates_none(store_app, spy):
     assert _records(store_app) == stored
 
 
+def test_a_hook_writing_to_a_file_request_session_stores_nothing(store_app, spy):
+    """Even written to by a hook, a file's session is neither stored nor sent."""
+    from flask import request, session
+
+    @store_app.before_request
+    def write_on_files():
+        if request.path == ASSET:
+            session['seen'] = 1
+    anonymous = store_app.test_client()
+    client = _login(store_app)
+    before = client.get_cookie('session').value
+    stored = _records(store_app)
+    spy.reset()
+    for c in (anonymous, client):
+        r = c.get(ASSET)
+        assert r.status_code == 200
+        assert 'Set-Cookie' not in r.headers
+        assert 'cookie' not in _vary(r)
+    assert anonymous.get_cookie('session') is None
+    assert client.get_cookie('session').value == before
+    assert spy.calls == []
+    assert _records(store_app) == stored
+
+
 # index.html, a missing asset (index.html in its place), the guide's pages and the API
-SESSION_PATHS = ('/', '/certificates', '/assets/gone-XyZ987.js', '/guide-prerender/en/cas.html',
+SESSION_PATHS = ('/', '/index.html', '/certificates', '/assets/gone-XyZ987.js', '/guide-prerender/en/cas.html',
                  '/guide/cas.html', '/api/v2/account/profile')
 
 

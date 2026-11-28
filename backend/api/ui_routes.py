@@ -122,8 +122,8 @@ def _serve_guide(chapter):
 
 
 def static_file(path):
-    """The file a GET of /<path> sends as is (build asset, favicon, manifest, font), else None:
-    the API, the protocols, the guide and its drawn pages, and a missing file get no file."""
+    """The file a GET of /<path> sends as is (build asset, favicon, font), else None: the API,
+    the protocols, index.html, the guide and its drawn pages, and a missing file get no file."""
     from utils.public_endpoints import is_public_protocol_path
     if not path or '.' not in path.split('/')[-1]:
         return None
@@ -132,7 +132,7 @@ def static_file(path):
     if path == 'guide' or path.startswith('guide/'):
         return None
     plain = posixpath.normpath('/' + path).lstrip('/')
-    if plain == PRERENDER_DIRNAME or plain.startswith(PRERENDER_DIRNAME + '/'):
+    if plain == 'index.html' or plain == PRERENDER_DIRNAME or plain.startswith(PRERENDER_DIRNAME + '/'):
         return None
     base = _frontend_base if path == 'topbar-demo.html' else FRONTEND_DIR
     # As send_from_directory resolves it: a path that leaves the folder is no file
