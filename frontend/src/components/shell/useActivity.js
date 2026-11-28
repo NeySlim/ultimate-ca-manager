@@ -25,14 +25,15 @@ export function useActivity(can) {
     if (!approvals && !queue && !jobs) return undefined
     let alive = true
     const set = (patch) => { if (alive) setState((s) => ({ ...s, ...patch })) }
-    const load = () => {
+    // The first read joins one the page opening alongside has started; the later ones read afresh
+    const load = (opening) => {
       if (approvals) {
         approvalsService.getStats()
           .then((res) => { const n = Number(unwrap(res)?.pending); if (Number.isFinite(n)) set({ approvals: n }) })
           .catch(() => {})
       }
       if (queue) {
-        overviewService.getQueue()
+        overviewService.getQueue(undefined, { reuse: opening === true })
           .then((res) => { const { act } = queueSplit(unwrap(res)); if (act !== null) set({ queue: act }) })
           .catch(() => {})
       }
@@ -42,10 +43,11 @@ export function useActivity(can) {
           .catch(() => {})
       }
     }
-    load()
-    const timer = setInterval(load, ACTIVITY_POLL_MS)
-    window.addEventListener('ucm:data-changed', load)
-    return () => { alive = false; clearInterval(timer); window.removeEventListener('ucm:data-changed', load) }
+    load(true)
+    const refresh = () => load(false)
+    const timer = setInterval(refresh, ACTIVITY_POLL_MS)
+    window.addEventListener('ucm:data-changed', refresh)
+    return () => { alive = false; clearInterval(timer); window.removeEventListener('ucm:data-changed', refresh) }
   }, [approvals, queue, jobs])
 
   const readable = approvals || queue || jobs

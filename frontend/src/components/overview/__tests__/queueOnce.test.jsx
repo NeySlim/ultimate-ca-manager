@@ -1,6 +1,6 @@
 /** The shell and the Overview cards read the queue once when the page opens. */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render, renderHook, screen, act } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 
 vi.mock('react-i18next', () => ({ Trans: ({ i18nKey }) => i18nKey, useTranslation: () => ({ t: (k) => k }) }))
@@ -18,10 +18,13 @@ vi.mock('../../../hooks/usePermission', () => ({ usePermission: () => ({ hasPerm
 
 import { QueueCard, MetricStrip } from '..'
 import { overviewService } from '../../../services/overview.service'
+import { useActivity } from '../../shell/useActivity'
+import { dropSharedRequests } from '../../../lib/sharedRequest'
 
 const queue = { data: { items: [], total: 0, counts: {}, filter_hints: {} } }
 
 beforeEach(() => {
+  dropSharedRequests()
   get.mockReset()
   get.mockResolvedValue(queue)
 })
@@ -40,5 +43,20 @@ describe('queue reads on opening', () => {
     await overviewService.getQueue()
     await overviewService.getQueue()
     expect(get).toHaveBeenCalledTimes(2)
+  })
+
+  it('the shell opening while the cards read joins their read, then reads afresh on a data change', async () => {
+    let release
+    get.mockImplementation(() => new Promise((r) => { release = () => r(queue) }))
+    const cards = overviewService.getQueue(100, { reuse: true })
+    const can = { hasPermission: (p) => p === 'read:dashboard' }
+    renderHook(() => useActivity(can))
+    const queueReads = () => get.mock.calls.filter(([url]) => url.startsWith('/dashboard/queue')).length
+    await act(async () => { await new Promise((r) => setTimeout(r, 10)) })
+    expect(queueReads()).toBe(1)
+    await act(async () => { release(); await cards })
+    get.mockResolvedValue(queue)
+    await act(async () => { window.dispatchEvent(new Event('ucm:data-changed')); await new Promise((r) => setTimeout(r, 10)) })
+    expect(queueReads()).toBe(2)
   })
 })
