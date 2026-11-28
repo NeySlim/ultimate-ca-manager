@@ -15,6 +15,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 - Settings no longer loads up to 500 certificates when it opens: the ACME public TLS certificate selector fetches its list the first time it is used, and the saved choice is named by a single certificate read.
 - The first Reports schedule or PDF templates request after a restart no longer waits for the PDF library to load (about 750 ms on a Raspberry Pi); it loads when a PDF is first rendered.
 - A native installation without a Base URL, `FQDN` or `UCM_FQDN` ran `hostname -f` three times per API request (60 to 75 ms per request on a Raspberry Pi); the name is now read once at startup, so a host name change takes effect after a service restart.
+- The interface's static files (build assets, favicon, fonts), which any cache may keep, no longer carry the session cookie nor `Vary: Cookie`, and serving them no longer reads or writes the session store; index.html, the guide and the API refresh the session as before.
 
 ### Changed
 

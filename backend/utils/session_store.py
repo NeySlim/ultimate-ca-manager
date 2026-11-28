@@ -145,6 +145,11 @@ def end_with_its_moves(session):
     session.follows_moves = True
 
 
+def _is_static_file_request(request):
+    from api.ui_routes import is_static_file_request
+    return is_static_file_request(request)
+
+
 def _close_sockets(sids):
     from auth.session_start import close_session_sockets
     for sid in dict.fromkeys(sids):
@@ -158,6 +163,14 @@ class KeepsRemovedRecordsGone:
     session that moves to a new identifier (rotate)."""
 
     def open_session(self, app, request):
+        if _is_static_file_request(request):
+            # A file cacheable by anyone: a detached empty session that its save never stores
+            # nor sends, so the store is not read and the account's record is left as it is
+            detached = self.session_class(sid=self._generate_sid(self.sid_length),
+                                          permanent=self.permanent)
+            detached.static_file = True
+            detached.stored_sid = None
+            return detached
         sid = request.cookies.get(app.config['SESSION_COOKIE_NAME'])
         if sid and self.use_signer:
             try:
@@ -227,7 +240,8 @@ class KeepsRemovedRecordsGone:
         return getattr(session, 'store_refused', None)
 
     def should_set_cookie(self, app, session):
-        return not self._refused(session) and super().should_set_cookie(app, session)
+        return (not self._refused(session) and not getattr(session, 'static_file', False)
+                and super().should_set_cookie(app, session))
 
     def _moved_to(self, store_id):
         """The identifier a move of ``store_id`` left in its pointer, or None."""
@@ -247,7 +261,7 @@ class KeepsRemovedRecordsGone:
         return removed
 
     def save_session(self, app, session, response):
-        if self._refused(session):
+        if self._refused(session) or getattr(session, 'static_file', False):
             return
         if not (not session and session.modified and self._opened_from_store(session)):
             return super().save_session(app, session, response)
@@ -393,7 +407,7 @@ class IsolatedSqlSessionInterface(KeepsRemovedRecordsGone, SqlAlchemySessionInte
         for the connect timeout): tried once, and a database that is away never fails it."""
         from flask import request
         from utils.public_endpoints import PROBE_PATHS
-        if request.path in PROBE_PATHS:
+        if request.path in PROBE_PATHS or _is_static_file_request(request):
             return
         if self.cleanup_n_requests and random.randint(0, self.cleanup_n_requests) == 0:
             try:

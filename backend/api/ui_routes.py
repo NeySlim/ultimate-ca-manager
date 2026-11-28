@@ -10,6 +10,8 @@ import os
 import posixpath
 import re
 
+from werkzeug.security import safe_join
+
 ui_bp = Blueprint('ui', __name__)
 
 # Frontend directory - relative to backend parent (BASE_DIR/frontend)
@@ -119,6 +121,31 @@ def _serve_guide(chapter):
     return response
 
 
+def static_file(path):
+    """The file a GET of /<path> sends as is (build asset, favicon, font), else None: the API,
+    the protocols, index.html, the guide and its drawn pages, and a missing file get no file."""
+    from utils.public_endpoints import is_public_protocol_path
+    if not path or '.' not in path.split('/')[-1]:
+        return None
+    if path.startswith(('api/', 'acme/')) or is_public_protocol_path('/' + path):
+        return None
+    if path == 'guide' or path.startswith('guide/'):
+        return None
+    plain = posixpath.normpath('/' + path).lstrip('/')
+    if plain == 'index.html' or plain == PRERENDER_DIRNAME or plain.startswith(PRERENDER_DIRNAME + '/'):
+        return None
+    base = _frontend_base if path == 'topbar-demo.html' else FRONTEND_DIR
+    # As send_from_directory resolves it: a path that leaves the folder is no file
+    found = safe_join(str(base), path)
+    return found if found and os.path.isfile(found) else None
+
+
+def is_static_file_request(req):
+    """A GET or HEAD the interface answers with a file: it needs no session (I12)."""
+    return req.method in ('GET', 'HEAD') and req.path.startswith('/') and \
+        static_file(req.path[1:]) is not None
+
+
 def _serve_asset(path):
     """Serve static assets with long cache for hashed files, no-cache for others"""
     response = make_response(send_from_directory(str(FRONTEND_DIR), path))
@@ -167,14 +194,13 @@ def spa(path):
     if path == 'topbar-demo.html':
         return send_from_directory(str(_frontend_base), 'topbar-demo.html')
 
-    # If path has an extension, it's likely a static file
-    if path and '.' in path.split('/')[-1]:
+    # A file of the build, as is; a missing one (stale chunk after an update) gets index.html,
+    # whose fresh chunk references the browser reloads
+    if static_file(path):
         try:
             return _serve_asset(path)
         except Exception:
-            # Hashed asset not found (stale cache after update) → serve index.html
-            # Browser will reload with fresh chunk references
-            pass
-    
+            pass  # removed since it was found
+
     # Serve index.html for all other routes (React Router will handle)
     return _serve_index()
