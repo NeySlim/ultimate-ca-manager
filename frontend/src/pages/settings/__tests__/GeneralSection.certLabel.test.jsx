@@ -105,4 +105,20 @@ describe('ACME public vhost TLS certificate selector (#365)', () => {
     expect(getById).toHaveBeenCalledWith('9')
     expect(getAll).not.toHaveBeenCalled()
   })
+
+  it('does not read again a saved certificate the opened list already holds', async () => {
+    getAll.mockReset()
+    getById.mockReset()
+    getAll.mockResolvedValue({ data: [{ id: 5, common_name: 'listed.example.com', has_private_key: true }] })
+    const props = { updateSetting: vi.fn(), handleSave: vi.fn(), saving: false, canWrite: () => true, hasPermission: () => true }
+    const { rerender } = render(<GeneralSection settings={{}} {...props} />)
+    openSelector()
+    await waitFor(() => {
+      const labels = Array.from(document.querySelectorAll('option')).map((o) => o.textContent)
+      expect(labels).toContain('listed.example.com (#5)')
+    })
+    rerender(<GeneralSection settings={{ acme_public_tls_cert_id: 5 }} {...props} />)
+    await new Promise((r) => setTimeout(r, 20))
+    expect(getById).not.toHaveBeenCalled()
+  })
 })

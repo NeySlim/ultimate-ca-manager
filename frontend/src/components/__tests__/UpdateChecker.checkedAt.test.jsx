@@ -1,15 +1,15 @@
 /** The update screen says how old the check it shows is, and flags a failed one. */
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 
-const mocks = vi.hoisted(() => ({ get: vi.fn() }))
+const mocks = vi.hoisted(() => ({ get: vi.fn(), showSuccess: vi.fn(), showError: vi.fn() }))
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (key, values) => (values ? `${key}:${Object.values(values).join('|')}` : key) }),
 }))
 vi.mock('../../services', () => ({ apiClient: { get: mocks.get, post: vi.fn() } }))
 vi.mock('../../contexts', () => ({
-  useNotification: () => ({ showSuccess: vi.fn(), showError: vi.fn(), showConfirm: vi.fn() }),
+  useNotification: () => ({ showSuccess: mocks.showSuccess, showError: mocks.showError, showConfirm: vi.fn() }),
 }))
 vi.mock('../../hooks', () => vi.importActual('../../hooks/useServiceReconnect'))
 vi.mock('../index.js', async () => {
@@ -26,7 +26,7 @@ vi.mock('../index.js', async () => {
 import { UpdateChecker } from '../UpdateChecker'
 
 describe('update check age', () => {
-  beforeEach(() => mocks.get.mockReset())
+  beforeEach(() => { mocks.get.mockReset(); mocks.showSuccess.mockReset(); mocks.showError.mockReset() })
 
   it('shows when the served answer was checked', async () => {
     const checkedAt = new Date(Date.now() - 3 * 3600000).toISOString()
@@ -49,5 +49,15 @@ describe('update check age', () => {
     render(<UpdateChecker />)
     expect(await screen.findByText('settings.checkFailed')).toBeInTheDocument()
     expect(screen.getByText('settings.updates.lastChecked')).toBeInTheDocument()
+  })
+
+  it('"Check now" reports a failed check as a failure, not as up to date', async () => {
+    mocks.get.mockResolvedValue({ data: { update_available: false, current_version: '3.1', error: 'offline',
+      checked_at: new Date().toISOString() } })
+    render(<UpdateChecker />)
+    fireEvent.click(await screen.findByText('settings.checkNow'))
+    await waitFor(() => expect(mocks.showError).toHaveBeenCalledTimes(1))
+    expect(mocks.showError.mock.calls[0][0]).toMatch(/^settings\.checkFailed/)
+    expect(mocks.showSuccess).not.toHaveBeenCalled()
   })
 })

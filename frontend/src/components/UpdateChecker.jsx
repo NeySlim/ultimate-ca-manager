@@ -41,7 +41,9 @@ export function UpdateChecker() {
       setUpdateInfo(data)
       setCampaign(data.update_campaign || null)
       if (showNotification) {
-        if (data.update_available) {
+        if (data.error) {
+          showError(t('settings.checkFailed', 'Failed to check for updates'))
+        } else if (data.update_available) {
           showSuccess(t('settings.updateAvailable', { version: data.latest_version }))
         } else {
           showSuccess(t('settings.upToDate'))

@@ -53,7 +53,7 @@ export default function GeneralSection({ settings, fieldErrors = {}, updateSetti
   // The saved choice is named by one certificate read, so the closed selector shows it
   const savedTlsCertId = settings.acme_public_tls_cert_id ? String(settings.acme_public_tls_cert_id) : ''
   useEffect(() => {
-    if (!savedTlsCertId) return undefined
+    if (!savedTlsCertId || tlsCertOptions.some((o) => o.value === savedTlsCertId)) return undefined
     let cancelled = false
     certificatesService.getById(savedTlsCertId)
       .then((res) => { if (!cancelled && res?.data) setSavedTlsCert(certOption(res.data)) })
