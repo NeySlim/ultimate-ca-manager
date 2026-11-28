@@ -36,7 +36,7 @@ def _budget():
 
 
 def _seed(app):
-    """A root and an intermediate with a CN, a cross-certificate and forty certificates, same on every run."""
+    """A root and an intermediate with a CN, a bare third CA, a cross-certificate and forty certificates."""
     now = utc_now()
     with app.app_context():
         root = CA(refid=uuid.uuid4().hex, descr=f'{MARK} ca 0', crt='', subject='CN=Budget Root')
@@ -78,12 +78,28 @@ def asset_dir(tmp_path_factory):
     ui.FRONTEND_DIR = saved
 
 
+# A viewer is refused (403) on these: the refusal has its own cost, frozen the same way
+VIEWER_REFUSED = {'/api/v2/webhooks', '/api/v2/settings/general', '/api/v2/reports/schedule'}
+
+
+@pytest.fixture(scope='module', autouse=True)
+def warm_allowlist():
+    """The admin allowlist is cached 5 s per process: a slow runner must not count its reload."""
+    from utils import admin_allowlist
+    saved = admin_allowlist._CACHE_TTL_SECONDS
+    admin_allowlist._CACHE_TTL_SECONDS = 3600.0
+    yield
+    admin_allowlist._CACHE_TTL_SECONDS = saved
+
+
 @pytest.fixture(scope='module')
-def lecteur(app, viewer_client):
+def lecteur(viewer_client):
+    # viewer_client falls back to the admin client if the viewer cannot be created
+    assert viewer_client.get('/api/v2/auth/verify').get_json()['data']['user']['role'] == 'viewer'
     return viewer_client
 
 
-def _measure(app, client, url):
+def _measure(app, client, url, expected=200):
     """(session statements, other statements) one GET runs, after a warm-up request."""
     from utils import admin_allowlist
     admin_allowlist.invalidate_cache()
@@ -106,8 +122,7 @@ def _measure(app, client, url):
     finally:
         for engine in engines:
             event.remove(engine, 'before_cursor_execute', listener)
-    # A viewer is refused on some routes (403): the refusal has its own cost, frozen the same way
-    assert response.status_code in (200, 403), (url, response.status_code, response.data[:200])
+    assert response.status_code == expected, (url, response.status_code, response.data[:200])
     return len(session), len(other)
 
 
@@ -123,12 +138,14 @@ def test_query_budget(app, auth_client, lecteur, fixed_data, asset_dir, who):
 
 def _check(app, client, engine, who):
     budget = _budget()[engine][who]
-    measured = {url: _measure(app, client, url) for url in ROUTES}
+    measured = {url: _measure(app, client, url, 403 if who == 'viewer' and url in VIEWER_REFUSED else 200)
+                for url in ROUTES}
     if budget is None:  # first measurement, to freeze
         pytest.fail('MEASURED ' + engine + ' ' + who + ' ' + json.dumps({u: list(m) for u, m in measured.items()}))
-    over = [f'{url}: measured {m[0]} session + {m[1]} other, budget {budget[url][0]} + {budget[url][1]}'
-            for url, m in measured.items() if m[0] > budget[url][0] or m[1] > budget[url][1]]
-    assert not over, 'over budget (a lot that lowers a cost lowers the budget):\n' + '\n'.join(over)
+    # Equality: a cost lowered without its budget would let a regression back to it pass unseen
+    off = [f'{url}: measured {m[0]} session + {m[1]} other, budget {budget.get(url)}'
+           for url, m in measured.items() if list(m) != budget.get(url)]
+    assert not off, 'off budget (raise it only for a reason, lower it with the cost):\n' + '\n'.join(off)
 
 
 def test_query_budget_is_stable(app, auth_client, fixed_data, asset_dir):
@@ -151,4 +168,7 @@ def test_query_budget_sql_sessions(monkeypatch, asset_dir):
     with fresh_app() as application:
         _seed(application)
         assert application.config['SESSION_TYPE'] == 'sqlalchemy'
-        _check(application, admin_client(application), 'postgresql+sql-sessions', 'admin')
+        try:
+            _check(application, admin_client(application), 'postgresql+sql-sessions', 'admin')
+        finally:
+            application.session_interface.dispose()
