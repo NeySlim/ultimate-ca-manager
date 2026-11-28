@@ -30,20 +30,40 @@ def test_general_settings_read_in_few_queries(app):
     assert len(statements) <= 2, f'{len(statements)} queries'
 
 
-def test_general_settings_values_are_unchanged_by_the_batch(app, auth_client):
-    # stored values come back through the batched read
+@pytest.fixture
+def leftover_settings(app):
     from models import SystemConfig
     with app.app_context():
-        db.session.add(SystemConfig(key='max_login_attempts', value='9'))
-        db.session.add(SystemConfig(key='session_timeout', value='1234'))
+        for k, v in (('max_login_attempts', '3'), ('session_timeout', '99')):
+            if not SystemConfig.query.filter_by(key=k).first():
+                db.session.add(SystemConfig(key=k, value=v))
+        db.session.commit()
+
+
+def test_general_settings_values_are_unchanged_by_the_batch(app, auth_client, leftover_settings):
+    # stored values come back through the batched read, even over rows another test left
+    from models import SystemConfig
+    keys = ('max_login_attempts', 'session_timeout')
+    with app.app_context():
+        saved = {r.key: r.value for r in SystemConfig.query.filter(SystemConfig.key.in_(keys))}
+        for k, v in (('max_login_attempts', '9'), ('session_timeout', '1234')):
+            row = SystemConfig.query.filter_by(key=k).first()
+            if row:
+                row.value = v
+            else:
+                db.session.add(SystemConfig(key=k, value=v))
         db.session.commit()
     try:
         data = auth_client.get('/api/v2/settings/general').get_json()['data']
         assert data['max_login_attempts'] == 9 and data['session_timeout'] == 1234
     finally:
         with app.app_context():
-            SystemConfig.query.filter(SystemConfig.key.in_(['max_login_attempts', 'session_timeout'])).delete(
-                synchronize_session=False)
+            for k in keys:
+                row = SystemConfig.query.filter_by(key=k).first()
+                if k in saved:
+                    row.value = saved[k]
+                elif row:
+                    db.session.delete(row)
             db.session.commit()
 
 
