@@ -18,9 +18,8 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Changed
 
-- The general settings and the report schedules are read with one query instead of one per setting (41 and 12 queries before, 2 and 1 now), and the encryption status counts its values in one query.
+- The general settings and the report schedules are read with one query instead of one per setting (41 and 12 queries before, 2 and 1 now), and the encryption status counts its values in three queries instead of one per row.
 - The update check serves the last answer from GitHub up to 6 hours old, with its age (`checked_at`, shown as "Last checked"), and remembers a failed check for 15 minutes, so opening Settings no longer waits for GitHub; "Check now" (`force=true`) always asks it.
-
 
 ## [3.1] - 2026-11-27
 

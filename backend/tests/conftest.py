@@ -254,14 +254,23 @@ class _GuardResolverProxy:
                      ('203.0.113.10', 0))]
 
 
+@contextlib.contextmanager
+def restored_releases_cache():
+    """The update checker's global cache comes back as it was on exit."""
+    from services import updates
+    saved = dict(updates._releases_cache)
+    try:
+        yield
+    finally:
+        updates._releases_cache.clear()
+        updates._releases_cache.update(saved)
+
+
 @pytest.fixture(autouse=True)
 def _restore_releases_cache():
     """The update checker's global cache never leaks from one test to the next."""
-    from services import updates
-    saved = dict(updates._releases_cache)
-    yield
-    updates._releases_cache.clear()
-    updates._releases_cache.update(saved)
+    with restored_releases_cache():
+        yield
 
 
 @pytest.fixture(autouse=True)
