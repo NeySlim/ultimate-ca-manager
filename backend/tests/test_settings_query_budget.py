@@ -1,5 +1,6 @@
 """The settings and report-schedule readers load their keys in one query, not one per key."""
 import json
+from contextlib import contextmanager
 
 import pytest
 from sqlalchemy import event
@@ -30,14 +31,53 @@ def test_general_settings_read_in_few_queries(app):
     assert len(statements) <= 2, f'{len(statements)} queries'
 
 
-@pytest.fixture
-def leftover_settings(app):
+_LEFTOVERS = (('max_login_attempts', '3'), ('session_timeout', '99'))
+
+
+@contextmanager
+def _seeded_leftovers(app):
+    # seeds the keys that are missing and deletes exactly those on exit
     from models import SystemConfig
     with app.app_context():
-        for k, v in (('max_login_attempts', '3'), ('session_timeout', '99')):
+        inserted = []
+        for k, v in _LEFTOVERS:
             if not SystemConfig.query.filter_by(key=k).first():
                 db.session.add(SystemConfig(key=k, value=v))
+                inserted.append(k)
         db.session.commit()
+    try:
+        yield
+    finally:
+        with app.app_context():
+            SystemConfig.query.filter(SystemConfig.key.in_(inserted)).delete(synchronize_session=False)
+            db.session.commit()
+
+
+@pytest.fixture
+def leftover_settings(app):
+    with _seeded_leftovers(app):
+        yield
+
+
+def test_seeded_leftovers_leave_no_row_behind(app):
+    # a session_timeout row left in the shared database logs out every later client
+    from models import SystemConfig
+    keys = [k for k, _ in _LEFTOVERS]
+    with app.app_context():
+        saved = {r.key: r.value for r in SystemConfig.query.filter(SystemConfig.key.in_(keys))}
+        SystemConfig.query.filter(SystemConfig.key.in_(keys)).delete(synchronize_session=False)
+        db.session.commit()
+    try:
+        with _seeded_leftovers(app):
+            pass
+        with app.app_context():
+            assert SystemConfig.query.filter(SystemConfig.key.in_(keys)).count() == 0
+    finally:
+        with app.app_context():
+            SystemConfig.query.filter(SystemConfig.key.in_(keys)).delete(synchronize_session=False)
+            for k, v in saved.items():
+                db.session.add(SystemConfig(key=k, value=v))
+            db.session.commit()
 
 
 def test_general_settings_values_are_unchanged_by_the_batch(app, auth_client, leftover_settings):
