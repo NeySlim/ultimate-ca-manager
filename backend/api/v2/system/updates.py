@@ -118,6 +118,10 @@ def install_update():
             if major_of(update_info['latest_version']) != major_of(get_current_version()):
                 return error_response(
                     "Another major version is only installed with major_upgrade=true", 400)
+            # The screen may show an older answer than this check: install only what was confirmed
+            if body.get('version') and body['version'] != update_info['latest_version']:
+                return error_response(
+                    f"The available version is {update_info['latest_version']}: check again", 409)
 
         if in_ha:
             return _start_rolling_update(update_info)

@@ -64,7 +64,7 @@ describe('waiting for UCM after an update', () => {
     await tick(0)
     fireEvent.click(screen.getByText('settings.updates.install'))
     await tick(0)
-    expect(mocks.post).toHaveBeenCalledWith('/system/updates/install', expect.anything())
+    expect(mocks.post).toHaveBeenCalledWith('/system/updates/install', expect.objectContaining({ version: '2.242' }))
     expect(screen.getByText('reconnect.updateNote:10')).toBeInTheDocument()
 
     await tick(MINUTE + 9 * MINUTE)

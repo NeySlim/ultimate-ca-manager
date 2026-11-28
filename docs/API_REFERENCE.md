@@ -3916,8 +3916,10 @@ POST /api/v2/system/updates/install
 # Install update (HA mode: starts a rolling update of every node, 409 when one runs, a node
 # has no package family (Docker, unknown), the release lacks a present family's package or
 # SHA-256, or its full-stop-migrations.json is missing or names a migration not yet applied;
-# Docker/Kubernetes: 400, the orchestrator updates; 502 with the message of a failed check)
+# Docker/Kubernetes: 400, the orchestrator updates; 502 with the message of a failed check;
+# 409 when the optional "version", the one the operator confirmed, is not the one GitHub now gives)
 POST /api/v2/system/updates/install
+{"version": "<latest_version>"}
 
 # install and campaign take admin:system or write:updates; the other routes admin:system
 # HA rolling update state: {ha, campaign: {status (running|stopped|done), target, order,

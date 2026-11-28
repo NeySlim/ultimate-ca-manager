@@ -100,3 +100,21 @@ def test_force_always_asks_github(auth_client, github):
     assert github['calls'] == 3
     assert 'error' in _check(auth_client, '?force=true')
     assert github['calls'] == 4
+
+
+def _install(client, **body):
+    return client.post('/api/v2/system/updates/install', json=body)
+
+
+def test_install_refuses_a_version_other_than_the_one_confirmed(auth_client, github, monkeypatch):
+    monkeypatch.setattr('services.updates.download_update', lambda *a, **k: pytest.fail('downloaded'))
+    major = updates.major_of(updates.get_current_version())
+    r = _install(auth_client, version=f'{major}.998')
+    assert r.status_code == 409, r.data
+    assert f'{major}.999' in r.get_json()['message']
+    # The confirmed version goes on to the next step (no package for this platform here)
+    r = _install(auth_client, version=f'{major}.999')
+    assert r.status_code == 400 and 'download URL' in r.get_json()['message'], r.data
+    # A client that names no version keeps the former behaviour
+    r = _install(auth_client)
+    assert r.status_code == 400 and 'download URL' in r.get_json()['message'], r.data

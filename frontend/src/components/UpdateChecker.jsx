@@ -74,7 +74,8 @@ export function UpdateChecker() {
     try {
       const response = await apiClient.post('/system/updates/install', {
         include_prereleases: includeChannel !== 'stable',
-        include_dev: includeChannel === 'dev'
+        include_dev: includeChannel === 'dev',
+        version: updateInfo.latest_version,
       })
       if (updateInfo.ha_mode) {
         // HA: the nodes update one at a time, this page follows the campaign instead of a restart
