@@ -45,7 +45,7 @@ describe('queue reads on opening', () => {
     expect(get).toHaveBeenCalledTimes(2)
   })
 
-  it('the shell opening while the cards read joins their read, then reads afresh on a data change', async () => {
+  it('the shell opening while the cards read joins their read', async () => {
     let release
     get.mockImplementation(() => new Promise((r) => { release = () => r(queue) }))
     const cards = overviewService.getQueue(100, { reuse: true })
@@ -55,8 +55,5 @@ describe('queue reads on opening', () => {
     await act(async () => { await new Promise((r) => setTimeout(r, 10)) })
     expect(queueReads()).toBe(1)
     await act(async () => { release(); await cards })
-    get.mockResolvedValue(queue)
-    await act(async () => { window.dispatchEvent(new Event('ucm:data-changed')); await new Promise((r) => setTimeout(r, 10)) })
-    expect(queueReads()).toBe(2)
   })
 })

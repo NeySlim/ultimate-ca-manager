@@ -94,6 +94,8 @@ export function UpdateChecker() {
     } catch (err) {
       showError(err.message || t('settings.installFailed', 'Failed to install update'))
       setInstalling(false)
+      // 409: GitHub now gives another version than the one shown, show it before a new confirmation
+      if (err?.status === 409) checkForUpdates(false, true)
     }
   }
 

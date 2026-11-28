@@ -96,4 +96,15 @@ describe('waiting for UCM after an update', () => {
     await tick(MINUTE)
     expect(result.current.status).toBe('timeout')
   })
+
+  it('a refused install (409, another version now) checks again with GitHub', async () => {
+    mocks.post.mockRejectedValue(Object.assign(new Error('The available version is 2.243: check again'), { status: 409 }))
+    render(<UpdateChecker />)
+    await tick(0)
+    const before = mocks.get.mock.calls.length
+    fireEvent.click(screen.getByText('settings.updates.install'))
+    await tick(0)
+    const after = mocks.get.mock.calls.slice(before).map(([url]) => url)
+    expect(after.some((url) => url.startsWith('/system/updates/check') && url.includes('force=true'))).toBe(true)
+  })
 })
