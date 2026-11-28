@@ -6,16 +6,42 @@ const later = (value) => new Promise((resolve) => setTimeout(() => resolve(value
 describe('sharedRequest', () => {
   it('runs once for the callers asking while it is in flight', async () => {
     const run = vi.fn(() => later({ data: [1, 2] }))
-    const [a, b] = await Promise.all([sharedRequest('k', run), sharedRequest('k', run)])
+    const [a, b] = await Promise.all([sharedRequest('k', run), sharedRequest('k', run, { reuseMs: 1000 })])
     expect(run).toHaveBeenCalledTimes(1)
     expect(b).toEqual(a)
   })
 
-  it('gives each caller its own copy', async () => {
+  it('gives each caller its own copy, the first one included', async () => {
     const run = () => later({ data: [3, 1, 2] })
-    const [a, b] = await Promise.all([sharedRequest('k', run), sharedRequest('k', run)])
+    const first = sharedRequest('k', run)
+    const second = sharedRequest('k', run, { reuseMs: 1000 })
+    const a = await first
     a.data.sort()
+    const b = await second
     expect(b.data).toEqual([3, 1, 2])
+    const c = await sharedRequest('k', run, { reuseMs: 1000 })
+    expect(c.data).toEqual([3, 1, 2])
+  })
+
+  it('reads again for a caller that does not opt in, even while a read is in flight', async () => {
+    dropSharedRequests()
+    const run = vi.fn(() => later({ call: run.mock.calls.length }))
+    const poll = sharedRequest('q', run, { reuseMs: 1000 })
+    const refresh = await sharedRequest('q', run)
+    expect(run).toHaveBeenCalledTimes(2)
+    expect(refresh.call).toBe(2)
+    expect((await poll).call).toBe(1)
+  })
+
+  it('forgets a read still in flight when data changes', async () => {
+    dropSharedRequests()
+    const run = vi.fn(() => later({ call: run.mock.calls.length }))
+    const poll = sharedRequest('q', run, { reuseMs: 1000 })
+    window.dispatchEvent(new Event('ucm:data-changed'))
+    const opened = await sharedRequest('q', run, { reuseMs: 1000 })
+    expect(run).toHaveBeenCalledTimes(2)
+    expect(opened.call).toBe(2)
+    expect((await poll).call).toBe(1)
   })
 
   it('asks again once it ended, unless the caller accepts a recent answer', async () => {
