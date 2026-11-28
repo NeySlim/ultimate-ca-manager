@@ -2,6 +2,7 @@ import { test, expect, createCA, createUser } from './support/fixtures'
 
 // The lists beyond Certificats: one density for every list (M:1108) and the sort and page footer of
 // the module lists, measured where jsdom cannot: row heights, the footer's place and the phone width
+// Polled: a row measured while the list re-renders reads 0
 const rowHeights = (page) => page.locator('.atl tbody tr').evaluateAll((rows) => rows.map((r) => Math.round(r.getBoundingClientRect().height)))
 
 test.describe('desktop', () => {
@@ -12,7 +13,7 @@ test.describe('desktop', () => {
     await createCA(api)
     await page.goto('/users')
     await expect(page.locator('.atl tbody tr').first()).toBeVisible()
-    expect(new Set(await rowHeights(page))).toEqual(new Set([36]))
+    await expect.poll(async () => [...new Set(await rowHeights(page))]).toEqual([36])
     await page.goto('/certificates')
     const toggle = page.getByRole('button', { name: 'Comfortable density' })
     await toggle.click()
@@ -20,15 +21,15 @@ test.describe('desktop', () => {
     await expect(page.locator('.atl #app')).toHaveClass(/comfortable/)
     await page.goto('/users')
     await expect(page.locator('.atl tbody tr').first()).toBeVisible()
-    expect(new Set(await rowHeights(page))).toEqual(new Set([44]))
+    await expect.poll(async () => [...new Set(await rowHeights(page))]).toEqual([44])
     await page.reload()
     await expect(page.locator('.atl tbody tr').first()).toBeVisible()
-    expect(new Set(await rowHeights(page))).toEqual(new Set([44]))
+    await expect.poll(async () => [...new Set(await rowHeights(page))]).toEqual([44])
     await page.goto('/certificates')
     await page.getByRole('button', { name: 'Comfortable density' }).click()
     await page.goto('/crl-ocsp')
     await expect(page.locator('.atl tbody tr').first()).toBeVisible()
-    expect(new Set(await rowHeights(page))).toEqual(new Set([36]))
+    await expect.poll(async () => [...new Set(await rowHeights(page))]).toEqual([36])
   })
 
   test('a long CRL / OCSP list sorts from its headers and pages under the table', async ({ page, api }) => {
